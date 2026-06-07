@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "fe_perf_tests",
+  "project_id": "cf153431-8d16-48b9-9eb9-285f7bf17259"
+}

@@ -5,8 +5,8 @@
     <!-- ═══════════════════════════════════════════════════════════
          TEST PLAN
          Journey: Operator Accreditation (baseline – 1 user, 1 iteration)
-         Entry:   /operator-accreditation/{orgId}/{siteId}/{material}/{year}
-         Crawled: localhost:3000  2026-06-17
+         Entry:   /operator-accreditation/{orgId}/{registrationId}/{material}/{year}
+         Crawled: localhost:3000  2026-07-12
          ═══════════════════════════════════════════════════════════ -->
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan"
               testname="Operator Accreditation Journey – Baseline">
@@ -29,9 +29,11 @@
             <stringProp name="Argument.name">ORG_ID</stringProp>
             <stringProp name="Argument.value">${__P(org_id,50001)}</stringProp>
           </elementProp>
-          <elementProp name="SITE_ID" elementType="Argument">
-            <stringProp name="Argument.name">SITE_ID</stringProp>
-            <stringProp name="Argument.value">${__P(site_id,site001)}</stringProp>
+          <!-- registrationId replaces siteId – route path changed to
+               /operator-accreditation/{orgId}/{registrationId}/{material}/{year} -->
+          <elementProp name="REGISTRATION_ID" elementType="Argument">
+            <stringProp name="Argument.name">REGISTRATION_ID</stringProp>
+            <stringProp name="Argument.value">${__P(registration_id,aaa000000000000000050001)}</stringProp>
           </elementProp>
           <elementProp name="MATERIAL_TYPE" elementType="Argument">
             <stringProp name="Argument.name">MATERIAL_TYPE</stringProp>
@@ -196,12 +198,13 @@
         <!-- ─────────────────────────────────────────────────────
              SECTION 2 – ACCREDITATION LANDING & TASK LIST
              Seeds or fetches the application; stores applicationId in session.
+             Route changed: siteId replaced by registrationId in URL path.
              ───────────────────────────────────────────────────── -->
 
         <!-- 03 GET operator-accreditation landing -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="03 GET operator-accreditation landing">
-          <stringProp name="HTTPSampler.path">/operator-accreditation/${ORG_ID}/${SITE_ID}/${MATERIAL_TYPE}/${ACCREDITATION_YEAR}</stringProp>
+          <stringProp name="HTTPSampler.path">/operator-accreditation/${ORG_ID}/${REGISTRATION_ID}/${MATERIAL_TYPE}/${ACCREDITATION_YEAR}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
         </HTTPSamplerProxy>
@@ -248,10 +251,10 @@
         </hashTree>
 
         <!-- ─────────────────────────────────────────────────────
-             SECTION 3 – PRNs (TONNAGE + AUTHORITY)
+             SECTION 3 – PRNs (TONNAGE + AUTHORITY + CYA)
              Route: /accreditation/tonnage/{applicationId}
                     /accreditation/tonnage-authority/{applicationId}
-             No CYA step in current app version.
+                    /accreditation/tonnage-cya/{applicationId}
              ───────────────────────────────────────────────────── -->
 
         <!-- 05 GET tonnage -->
@@ -430,7 +433,7 @@
         </HTTPSamplerProxy>
         <hashTree/>
 
-        <!-- 11 GET tonnage-cya (controller redirects here after saveAndContinue on tonnage-authority) -->
+        <!-- 11 GET tonnage-cya -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="11 GET tonnage-cya">
           <stringProp name="HTTPSampler.path">/accreditation/tonnage-cya/${applicationId}</stringProp>
@@ -490,9 +493,9 @@
              Percentages must sum to exactly 100.
              ───────────────────────────────────────────────────── -->
 
-        <!-- 11 GET business-plan -->
+        <!-- 13 GET business-plan -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="11 GET business-plan">
+                          testname="13 GET business-plan">
           <stringProp name="HTTPSampler.path">/accreditation/business-plan/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -519,9 +522,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 12 POST business-plan – percentages (must sum to 100) -->
+        <!-- 14 POST business-plan – percentages (must sum to 100) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="12 POST business-plan (percentages)">
+                          testname="14 POST business-plan (percentages)">
           <stringProp name="HTTPSampler.path">/accreditation/business-plan/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -572,9 +575,9 @@
         </HTTPSamplerProxy>
         <hashTree/>
 
-        <!-- 13 GET business-plan-detail -->
+        <!-- 15 GET business-plan-detail -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="13 GET business-plan-detail">
+                          testname="15 GET business-plan-detail">
           <stringProp name="HTTPSampler.path">/accreditation/business-plan-detail/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -601,9 +604,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 14 POST business-plan-detail (all detail fields are optional) -->
+        <!-- 16 POST business-plan-detail (all detail fields are optional) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="14 POST business-plan-detail">
+                          testname="16 POST business-plan-detail">
           <stringProp name="HTTPSampler.path">/accreditation/business-plan-detail/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -624,9 +627,9 @@
         </HTTPSamplerProxy>
         <hashTree/>
 
-        <!-- 15 GET business-plan-cya -->
+        <!-- 17 GET business-plan-cya -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="15 GET business-plan-cya">
+                          testname="17 GET business-plan-cya">
           <stringProp name="HTTPSampler.path">/accreditation/business-plan-cya/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -653,9 +656,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 16 POST business-plan-cya – confirm -->
+        <!-- 18 POST business-plan-cya – confirm -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="16 POST business-plan-cya (confirm)">
+                          testname="18 POST business-plan-cya (confirm)">
           <stringProp name="HTTPSampler.path">/accreditation/business-plan-cya/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -680,13 +683,14 @@
              SECTION 5 – SAMPLING PLAN (file upload)
              Route: /accreditation/sampling-plan/{applicationId}
              Step 1 – upload file (action=uploadFile, multipart)
-             Step 2 – mark section complete (action=saveAndContinue)
+             Step 2 – poll status page (follows 302 back to main page)
+             Step 3 – mark section complete (action=saveAndContinue)
              Note: ScanStatus=Pending is treated as eligible.
              ───────────────────────────────────────────────────── -->
 
-        <!-- 17 GET sampling-plan -->
+        <!-- 19 GET sampling-plan -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="17 GET sampling-plan">
+                          testname="19 GET sampling-plan">
           <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -713,9 +717,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 18 POST sampling-plan – upload file (multipart/form-data) -->
+        <!-- 20 POST sampling-plan – upload file (multipart/form-data) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="18 POST sampling-plan (upload file)">
+                          testname="20 POST sampling-plan (upload file)">
           <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -746,9 +750,10 @@
         </HTTPSamplerProxy>
         <hashTree/>
 
-        <!-- 19 GET sampling-plan/status (polls CDP uploader; follows 302 to main page when scan complete) -->
+        <!-- 21 GET sampling-plan/status (polls CDP uploader; status controller registers
+             the file then follows 302 back to main sampling-plan page when scan complete) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="19 GET sampling-plan/status (wait for scan)">
+                          testname="21 GET sampling-plan/status (wait for scan)">
           <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/status</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -773,9 +778,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 20 POST sampling-plan – mark section complete (file already uploaded) -->
+        <!-- 22 POST sampling-plan – mark section complete (file already uploaded) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="20 POST sampling-plan (mark complete)">
+                          testname="22 POST sampling-plan (mark complete)">
           <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -804,9 +809,9 @@
              Fields: fullName, jobTitle, email
              ───────────────────────────────────────────────────── -->
 
-        <!-- 21 GET task list (verify all sections complete before submit) -->
+        <!-- 23 GET task list (verify all sections complete before submit) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="21 GET task list (all sections complete)">
+                          testname="23 GET task list (all sections complete)">
           <stringProp name="HTTPSampler.path">/accreditation/task-list/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -823,9 +828,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 22 GET submit-declaration -->
+        <!-- 24 GET submit-declaration -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="22 GET submit-declaration">
+                          testname="24 GET submit-declaration">
           <stringProp name="HTTPSampler.path">/accreditation/submit-declaration/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -852,9 +857,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 23 POST submit-declaration -->
+        <!-- 25 POST submit-declaration -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="23 POST submit-declaration">
+                          testname="25 POST submit-declaration">
           <stringProp name="HTTPSampler.path">/accreditation/submit-declaration/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -900,9 +905,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 24 GET submit-confirmation -->
+        <!-- 26 GET submit-confirmation -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="24 GET submit-confirmation">
+                          testname="26 GET submit-confirmation">
           <stringProp name="HTTPSampler.path">/accreditation/submit-confirmation/${applicationId}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -919,9 +924,9 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 25 GET sign out -->
+        <!-- 27 GET sign out -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="25 GET sign out">
+                          testname="27 GET sign out">
           <stringProp name="HTTPSampler.path">/auth/logout</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>

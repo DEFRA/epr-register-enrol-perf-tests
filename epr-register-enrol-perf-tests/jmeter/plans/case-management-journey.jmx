@@ -1,0 +1,2412 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan"
+              testname="Case Management — Re-accreditation Performance Tests" enabled="true">
+      <stringProp name="TestPlan.comments">Performance test — all re-accreditation work-item lifecycle journeys.
+Pre-seed work items with: jmeter/scripts/seed-cms-work-items.sh
+
+Thread Groups (parallel):
+  1. Approval  (3 threads) England/plastic, Scotland/steel, Wales/paper
+  2. Refusal   (2 threads) NI/glass, England/aluminium
+  3. Query     (2 threads) Wales/wood, Scotland/plastic
+  4a. Withdraw at submitted (1 thread) England/steel
+  4b. Withdraw at duly-made (1 thread) NI/paper
+  4c. Withdraw at assessment (1 thread) Scotland/glass
+Total: 10 pre-seeded work items processed concurrently.</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments"
+                   guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="BASE_URL" elementType="Argument">
+            <stringProp name="Argument.name">BASE_URL</stringProp>
+            <stringProp name="Argument.value">${__P(base_url,localhost)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="PORT" elementType="Argument">
+            <stringProp name="Argument.name">PORT</stringProp>
+            <stringProp name="Argument.value">${__P(port,5001)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="PROTOCOL" elementType="Argument">
+            <stringProp name="Argument.name">PROTOCOL</stringProp>
+            <stringProp name="Argument.value">${__P(protocol,http)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="DATA_DIR" elementType="Argument">
+            <stringProp name="Argument.name">DATA_DIR</stringProp>
+            <stringProp name="Argument.value">${__P(data_dir,jmeter/data)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+    </TestPlan>
+    <hashTree>
+      <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement"
+                         testname="HTTP Request Defaults" enabled="true">
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+        <stringProp name="HTTPSampler.domain">${BASE_URL}</stringProp>
+        <stringProp name="HTTPSampler.port">${PORT}</stringProp>
+        <stringProp name="HTTPSampler.protocol">${PROTOCOL}</stringProp>
+        <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+      </ConfigTestElement>
+      <hashTree/>
+
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
+                   testname="Thread Group 1: Approval Journey — England / Scotland / Wales" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">stopthread</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
+                     guiclass="LoopControlPanel" testclass="LoopController"
+                     testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <intProp name="ThreadGroup.num_threads">3</intProp>
+        <intProp name="ThreadGroup.ramp_time">2</intProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-approve.csv" enabled="true">
+        <stringProp name="filename">${DATA_DIR}/cms-approve.csv</stringProp>
+        <stringProp name="variableNames">workItemId,nation,material</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+                     testname="HTTP Cookie Manager" enabled="true">
+        <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+        <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+      </CookieManager>
+      <hashTree/>
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Login" enabled="true"/>
+      <hashTree>
+        <!-- 01 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="01 GET stub login page" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 02 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="02 POST stub login" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="nation" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">nation</stringProp>
+              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Submitted State — Complete Tasks" enabled="true"/>
+      <hashTree>
+        <!-- 03 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="03 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 04 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="04 POST complete task verify-organisation-details" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/verify-organisation-details/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 05 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="05 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 06 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="06 POST complete task confirm-application-completeness" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-application-completeness/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Duly-Made State — Payment Received" enabled="true"/>
+      <hashTree>
+        <!-- 07 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="07 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 08 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="08 POST complete task confirm-registration-fee-paid" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-registration-fee-paid/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 09 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="09 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 10 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="10 POST action payment-received" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/payment-received</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Assessment State — Complete Tasks" enabled="true"/>
+      <hashTree>
+        <!-- 11 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="11 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 12 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="12 POST complete task review-compliance-history" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/review-compliance-history/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 13 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="13 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 14 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="14 POST complete task assess-technical-capacity" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/assess-technical-capacity/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 15 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="15 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 16 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="16 POST complete task assess-financial-capacity" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/assess-financial-capacity/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 17 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="17 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 18 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="18 POST action submit-for-decision" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/submit-for-decision</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Awaiting Decision — Record Rationale" enabled="true"/>
+      <hashTree>
+        <!-- 19 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="19 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 20 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="20 POST complete task record-decision-rationale" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/record-decision-rationale/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Approve Determination" enabled="true"/>
+      <hashTree>
+        <!-- 21 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="21 GET approve interstitial" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/re-accreditation/${workItemId}/approve</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 22 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="22 POST approve determination" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/re-accreditation/${workItemId}/approve</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="decisionNote" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">decisionNote</stringProp>
+              <stringProp name="Argument.value">Approved after full assessment.</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+      </hashTree>
+
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
+                   testname="Thread Group 2: Refusal Journey — NI / England" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">stopthread</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
+                     guiclass="LoopControlPanel" testclass="LoopController"
+                     testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">2</intProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-refuse.csv" enabled="true">
+        <stringProp name="filename">${DATA_DIR}/cms-refuse.csv</stringProp>
+        <stringProp name="variableNames">workItemId,nation,material</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+                     testname="HTTP Cookie Manager" enabled="true">
+        <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+        <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+      </CookieManager>
+      <hashTree/>
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Login" enabled="true"/>
+      <hashTree>
+        <!-- 01 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="01 GET stub login page" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 02 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="02 POST stub login" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="nation" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">nation</stringProp>
+              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Submitted State — Complete Tasks" enabled="true"/>
+      <hashTree>
+        <!-- 03 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="03 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 04 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="04 POST complete task verify-organisation-details" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/verify-organisation-details/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 05 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="05 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 06 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="06 POST complete task confirm-application-completeness" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-application-completeness/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Duly-Made State — Payment Received" enabled="true"/>
+      <hashTree>
+        <!-- 07 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="07 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 08 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="08 POST complete task confirm-registration-fee-paid" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-registration-fee-paid/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 09 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="09 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 10 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="10 POST action payment-received" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/payment-received</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Assessment State — Complete Tasks" enabled="true"/>
+      <hashTree>
+        <!-- 11 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="11 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 12 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="12 POST complete task review-compliance-history" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/review-compliance-history/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 13 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="13 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 14 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="14 POST complete task assess-technical-capacity" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/assess-technical-capacity/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 15 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="15 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 16 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="16 POST complete task assess-financial-capacity" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/assess-financial-capacity/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 17 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="17 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 18 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="18 POST action submit-for-decision" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/submit-for-decision</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Awaiting Decision — Record Rationale" enabled="true"/>
+      <hashTree>
+        <!-- 19 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="19 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 20 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="20 POST complete task record-decision-rationale" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/record-decision-rationale/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Refuse Determination" enabled="true"/>
+      <hashTree>
+        <!-- 21 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="21 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 22 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="22 POST action reject" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/reject</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+      </hashTree>
+
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
+                   testname="Thread Group 3: Query Journey — Wales / Scotland" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">stopthread</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
+                     guiclass="LoopControlPanel" testclass="LoopController"
+                     testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">2</intProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-query.csv" enabled="true">
+        <stringProp name="filename">${DATA_DIR}/cms-query.csv</stringProp>
+        <stringProp name="variableNames">workItemId,nation,material</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+                     testname="HTTP Cookie Manager" enabled="true">
+        <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+        <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+      </CookieManager>
+      <hashTree/>
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Login" enabled="true"/>
+      <hashTree>
+        <!-- 01 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="01 GET stub login page" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 02 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="02 POST stub login" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="nation" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">nation</stringProp>
+              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Submitted State — Complete Tasks" enabled="true"/>
+      <hashTree>
+        <!-- 03 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="03 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 04 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="04 POST complete task verify-organisation-details" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/verify-organisation-details/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 05 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="05 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 06 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="06 POST complete task confirm-application-completeness" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-application-completeness/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Duly-Made State — Payment Received" enabled="true"/>
+      <hashTree>
+        <!-- 07 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="07 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 08 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="08 POST complete task confirm-registration-fee-paid" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-registration-fee-paid/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 09 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="09 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 10 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="10 POST action payment-received" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/payment-received</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Query Application During Assessment" enabled="true"/>
+      <hashTree>
+        <!-- 11 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="11 GET query form" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/query</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 12 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="12 POST submit query" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/query</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="sections" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">sections</stringProp>
+              <stringProp name="Argument.value">prn-tonnage</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="sections" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">sections</stringProp>
+              <stringProp name="Argument.value">business-plan</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="reason" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">reason</stringProp>
+              <stringProp name="Argument.value">Query raised on tonnage figures and business plan costings. Please provide supporting evidence.</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+      </hashTree>
+
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
+                   testname="Thread Group 4a: Withdrawal at Submitted — England" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">stopthread</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
+                     guiclass="LoopControlPanel" testclass="LoopController"
+                     testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <intProp name="ThreadGroup.num_threads">1</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-withdraw-submitted.csv" enabled="true">
+        <stringProp name="filename">${DATA_DIR}/cms-withdraw-submitted.csv</stringProp>
+        <stringProp name="variableNames">workItemId,nation,material</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+                     testname="HTTP Cookie Manager" enabled="true">
+        <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+        <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+      </CookieManager>
+      <hashTree/>
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Login" enabled="true"/>
+      <hashTree>
+        <!-- 01 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="01 GET stub login page" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 02 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="02 POST stub login" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="nation" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">nation</stringProp>
+              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Withdraw at Submitted" enabled="true"/>
+      <hashTree>
+        <!-- 03 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="03 GET withdraw confirm page" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/withdraw/confirm</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 04 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="04 POST confirm withdrawal" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/withdraw/confirm</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="note" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">note</stringProp>
+              <stringProp name="Argument.value">Withdrawn as part of performance test.</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+      </hashTree>
+
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
+                   testname="Thread Group 4b: Withdrawal at Duly-Made — NI" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">stopthread</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
+                     guiclass="LoopControlPanel" testclass="LoopController"
+                     testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <intProp name="ThreadGroup.num_threads">1</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-withdraw-duly-made.csv" enabled="true">
+        <stringProp name="filename">${DATA_DIR}/cms-withdraw-duly-made.csv</stringProp>
+        <stringProp name="variableNames">workItemId,nation,material</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+                     testname="HTTP Cookie Manager" enabled="true">
+        <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+        <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+      </CookieManager>
+      <hashTree/>
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Login" enabled="true"/>
+      <hashTree>
+        <!-- 01 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="01 GET stub login page" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 02 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="02 POST stub login" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="nation" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">nation</stringProp>
+              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Submitted State — Complete Tasks" enabled="true"/>
+      <hashTree>
+        <!-- 03 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="03 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 04 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="04 POST complete task verify-organisation-details" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/verify-organisation-details/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 05 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="05 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 06 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="06 POST complete task confirm-application-completeness" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-application-completeness/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Withdraw During Duly-Made" enabled="true"/>
+      <hashTree>
+        <!-- 07 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="07 GET withdraw confirm page" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/withdraw-during-duly-made/confirm</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 08 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="08 POST confirm withdrawal" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/withdraw-during-duly-made/confirm</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="note" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">note</stringProp>
+              <stringProp name="Argument.value">Withdrawn as part of performance test.</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+      </hashTree>
+
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
+                   testname="Thread Group 4c: Withdrawal at Assessment — Scotland" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">stopthread</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
+                     guiclass="LoopControlPanel" testclass="LoopController"
+                     testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <intProp name="ThreadGroup.num_threads">1</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-withdraw-assessment.csv" enabled="true">
+        <stringProp name="filename">${DATA_DIR}/cms-withdraw-assessment.csv</stringProp>
+        <stringProp name="variableNames">workItemId,nation,material</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+                     testname="HTTP Cookie Manager" enabled="true">
+        <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+        <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+      </CookieManager>
+      <hashTree/>
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Login" enabled="true"/>
+      <hashTree>
+        <!-- 01 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="01 GET stub login page" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 02 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="02 POST stub login" enabled="true">
+        <stringProp name="HTTPSampler.path">/auth/stub/login</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="nation" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">nation</stringProp>
+              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Submitted State — Complete Tasks" enabled="true"/>
+      <hashTree>
+        <!-- 03 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="03 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 04 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="04 POST complete task verify-organisation-details" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/verify-organisation-details/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 05 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="05 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 06 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="06 POST complete task confirm-application-completeness" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-application-completeness/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Duly-Made State — Payment Received" enabled="true"/>
+      <hashTree>
+        <!-- 07 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="07 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 08 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="08 POST complete task confirm-registration-fee-paid" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/tasks/confirm-registration-fee-paid/complete</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+
+      <!-- 09 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="09 GET work-item detail (refresh crumb)" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 10 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="10 POST action payment-received" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/payment-received</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+
+      <GenericController guiclass="LogicControllerGui" testclass="GenericController"
+                         testname="Withdraw During Assessment" enabled="true"/>
+      <hashTree>
+        <!-- 11 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="11 GET withdraw confirm page" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/withdraw-during-assessment/confirm</stringProp>
+        <stringProp name="HTTPSampler.method">GET</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+        <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                      testname="Extract crumb_token" enabled="true">
+        <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+        <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+        <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+        <stringProp name="RegexExtractor.template">$1$</stringProp>
+        <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+        <stringProp name="RegexExtractor.match_no">1</stringProp>
+      </RegexExtractor>
+      <hashTree/>
+      </hashTree>
+
+      <!-- 12 -->
+      <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                        testname="12 POST confirm withdrawal" enabled="true">
+        <stringProp name="HTTPSampler.path">/work-items/${workItemId}/actions/withdraw-during-assessment/confirm</stringProp>
+        <stringProp name="HTTPSampler.method">POST</stringProp>
+        <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+        <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments">
+      
+            <elementProp name="note" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">note</stringProp>
+              <stringProp name="Argument.value">Withdrawn as part of performance test.</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+
+            <elementProp name="crumb" elementType="HTTPArgument">
+              <boolProp name="HTTPArgument.always_encode">true</boolProp>
+              <stringProp name="Argument.name">crumb</stringProp>
+              <stringProp name="Argument.value">${crumb_token}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+      </HTTPSamplerProxy>
+      <hashTree>
+  
+      </hashTree>
+      </hashTree>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

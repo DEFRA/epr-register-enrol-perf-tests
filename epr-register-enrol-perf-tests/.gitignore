@@ -1,0 +1,10 @@
+jmeter/results/
+*.jtl
+*.log
+.claude/*
+settings.*
+report-output
+*.idea
+../jmeter/.DS_Store
+../.beads/issues.jsonl
+.beads/issues.jsonl

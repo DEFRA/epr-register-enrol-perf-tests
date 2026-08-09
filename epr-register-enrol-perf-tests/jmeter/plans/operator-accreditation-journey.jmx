@@ -604,7 +604,7 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 16 POST business-plan-detail (all detail fields are optional) -->
+        <!-- 16 POST business-plan-detail – detail fields required when percent > 0 -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="16 POST business-plan-detail">
           <stringProp name="HTTPSampler.path">/accreditation/business-plan-detail/${applicationId}</stringProp>
@@ -616,6 +616,36 @@
                 <boolProp name="HTTPArgument.always_encode">true</boolProp>
                 <stringProp name="Argument.name">crumb</stringProp>
                 <stringProp name="Argument.value">${crumb_token}</stringProp>
+              </elementProp>
+              <elementProp name="newInfrastructureDetail" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">newInfrastructureDetail</stringProp>
+                <stringProp name="Argument.value">Investment in new sorting and processing equipment.</stringProp>
+              </elementProp>
+              <elementProp name="priceSupportDetail" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">priceSupportDetail</stringProp>
+                <stringProp name="Argument.value">Price support payments to maintain collection viability.</stringProp>
+              </elementProp>
+              <elementProp name="businessCollectionsDetail" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">businessCollectionsDetail</stringProp>
+                <stringProp name="Argument.value">Expansion of commercial collection services.</stringProp>
+              </elementProp>
+              <elementProp name="communicationsDetail" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">communicationsDetail</stringProp>
+                <stringProp name="Argument.value">Public awareness campaign promoting recycling.</stringProp>
+              </elementProp>
+              <elementProp name="newMarketsDetail" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">newMarketsDetail</stringProp>
+                <stringProp name="Argument.value">Development of relationships with new industry sectors.</stringProp>
+              </elementProp>
+              <elementProp name="newUsesDetail" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">newUsesDetail</stringProp>
+                <stringProp name="Argument.value">Trials of recycled material use in manufacturing.</stringProp>
               </elementProp>
               <elementProp name="submitAction" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
@@ -741,7 +771,7 @@
           <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
             <collectionProp name="HTTPFileArgs.files">
               <elementProp name="sampling-plan.pdf" elementType="HTTPFileArg">
-                <stringProp name="File.path">${__P(test_files_dir,../test-files)}/sampling-plan.pdf</stringProp>
+                <stringProp name="File.path">${__P(test_files_dir,jmeter/test-files)}/sampling-plan.pdf</stringProp>
                 <stringProp name="File.paramname">file</stringProp>
                 <stringProp name="File.mimetype">application/pdf</stringProp>
               </elementProp>

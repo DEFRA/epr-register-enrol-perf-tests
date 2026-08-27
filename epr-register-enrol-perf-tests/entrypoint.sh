@@ -24,6 +24,10 @@ set -euo pipefail
 #   OJ_SKIP_SEED=true ./entrypoint.sh operator-bulk                  # reuse existing CSV rows (they're one-shot; only safe if the previous run didn't consume them all)
 #
 # plan: operator | regulator | operator-accreditation | operator-bulk | case-management | all (default: all)
+#   No plan argument needed for normal use — the Dockerfile's ENTRYPOINT
+#   already bakes in "all", which runs operator-accreditation then
+#   case-management, one after the other. operator/regulator/operator-bulk
+#   are only reachable by naming them explicitly.
 
 ENVIRONMENT="${ENVIRONMENT:-staging}"
 TEST_USERNAME="${TEST_USERNAME:-}"
@@ -165,9 +169,22 @@ case "$PLAN" in
     run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
     ;;
   all)
-    run_plan "operator-journey"
-    run_plan "regulator-journey"
+    # Default entrypoint (no plan argument needed) — runs both real services
+    # one after the other: operator frontend (epr-register-enrol-frontend),
+    # then case management (epr-register-enrol-management-fe). Deliberately
+    # excludes operator-journey (basic smoke test) and regulator-journey —
+    # neither is one of the two services this suite targets.
+    echo "=== 1/2: Operator accreditation (epr-register-enrol-frontend) ==="
     run_plan "operator-accreditation-journey"
+
+    echo "=== 2/2: Case management (epr-register-enrol-management-fe) ==="
+    echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
+    if [[ "$CM_SKIP_SEED" != "true" ]]; then
+      echo "Seeding work items into local MongoDB…"
+      bash "$(dirname "$0")/jmeter/scripts/seed-cms-work-items.sh"
+    else
+      echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
+    fi
     run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
     ;;
   *)

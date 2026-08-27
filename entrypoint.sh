@@ -103,27 +103,38 @@ else
   export SERVICE_URL_SCHEME="$PROTOCOL"
 fi
 
-PLANS_DIR="$(dirname "$0")/scenarios"
-RESULTS_DIR="$(dirname "$0")/jmeter/results"
+# Matches the base image's own entrypoint.sh convention: JM_HOME defaults to
+# /opt/perftest, the Dockerfile's WORKDIR, so paths resolve the same way
+# whether the base image's stock script or this one runs. Falls back to the
+# script's own directory when /opt/perftest doesn't exist (local runs outside
+# the container).
+JM_HOME="${JM_HOME:-/opt/perftest}"
+if [[ ! -d "$JM_HOME" ]]; then
+  JM_HOME="$(cd "$(dirname "$0")" && pwd)"
+fi
+
+JM_SCENARIOS="$JM_HOME/scenarios"
+JM_LOGS="$JM_HOME/logs"
+RESULTS_DIR="$JM_HOME/jmeter/results"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
 # HTML dashboard reports, matching the reference epr-re-ex-performance-tests
 # entrypoint.sh convention (and this repo's own compose.yml, which already
 # mounts ./reports:/opt/perftest/reports) -- CDP Portal's report page reads
 # from here, not from jmeter/results/*.jtl.
-JM_REPORTS="$(dirname "$0")/reports"
+JM_REPORTS="$JM_HOME/reports"
 REPORT_NAMES=()
 
-mkdir -p "$RESULTS_DIR" "$JM_REPORTS"
+mkdir -p "$RESULTS_DIR" "$JM_LOGS" "$JM_REPORTS"
 
 run_plan() {
   local name="$1"
   local base="${2:-$BASE_URL}"
   local port="${3:-$PORT}"
   local proto="${4:-$PROTOCOL}"
-  local jmx="$PLANS_DIR/${name}.jmx"
+  local jmx="$JM_SCENARIOS/${name}.jmx"
   local jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
-  local log="$RESULTS_DIR/${name}_${TIMESTAMP}.log"
+  local log="$JM_LOGS/${name}_${TIMESTAMP}.log"
   local report_dir="$JM_REPORTS/${name}"
 
   echo "Running: $name → $proto://$base:$port"
@@ -196,17 +207,17 @@ case "$PLAN" in
     OJ_SKIP_SEED="${OJ_SKIP_SEED:-false}"
     if [[ "$OJ_SKIP_SEED" != "true" ]]; then
       echo "Seeding fresh reprocessor/exporter application rows…"
-      bash "$(dirname "$0")/jmeter/scripts/seed-operator-journey-csvs.sh"
+      bash "$JM_HOME/jmeter/scripts/seed-operator-journey-csvs.sh"
     else
       echo "Skipping seed (OJ_SKIP_SEED=true) — reusing existing CSV rows"
     fi
     name="operator-journey-reprocessor-exporter"
     jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
-    log="$RESULTS_DIR/${name}_${TIMESTAMP}.log"
+    log="$JM_LOGS/${name}_${TIMESTAMP}.log"
     report_dir="$JM_REPORTS/${name}"
     echo "Running: $name → $PROTOCOL://$BASE_URL:$PORT (ramp ${RAMP_TIME:-5}s)"
     jmeter -n \
-      -t "$PLANS_DIR/${name}.jmx" \
+      -t "$JM_SCENARIOS/${name}.jmx" \
       -l "$jtl" \
       -j "$log" \
       -e -o "$report_dir" \
@@ -228,7 +239,7 @@ case "$PLAN" in
     echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
     if [[ "$CM_SKIP_SEED" != "true" ]]; then
       echo "Seeding work items into local MongoDB…"
-      bash "$(dirname "$0")/jmeter/scripts/seed-cms-work-items.sh"
+      bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
     else
       echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
     fi
@@ -247,7 +258,7 @@ case "$PLAN" in
     echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
     if [[ "$CM_SKIP_SEED" != "true" ]]; then
       echo "Seeding work items into local MongoDB…"
-      bash "$(dirname "$0")/jmeter/scripts/seed-cms-work-items.sh"
+      bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
     else
       echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
     fi

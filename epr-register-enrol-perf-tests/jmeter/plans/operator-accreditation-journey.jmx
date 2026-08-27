@@ -766,6 +766,11 @@
                 <stringProp name="Argument.name">action</stringProp>
                 <stringProp name="Argument.value">uploadFile</stringProp>
               </elementProp>
+              <elementProp name="documentType" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">documentType</stringProp>
+                <stringProp name="Argument.value">SamplingPlan</stringProp>
+              </elementProp>
             </collectionProp>
           </elementProp>
           <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
@@ -808,10 +813,12 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 22 POST sampling-plan – mark section complete (file already uploaded) -->
+        <!-- 22 POST sampling-plan results – mark section complete (file already
+             uploaded; the CDP-scan redirect in step 21 lands on /results, and
+             saveAndContinue is now only handled by the results route's POST) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
-                          testname="22 POST sampling-plan (mark complete)">
-          <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}</stringProp>
+                          testname="22 POST sampling-plan results (mark complete)">
+          <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/results</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments">

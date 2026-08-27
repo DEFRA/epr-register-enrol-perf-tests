@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Seed 10 re-accreditation work items into the case-management MongoDB and
-# write the four JMeter CSV data files.
+# Seed re-accreditation work items into the case-management MongoDB and
+# write the three JMeter CSV data files.
 #
-# Usage: ./jmeter/scripts/seed-cms-work-items.sh [--mongo-container <name>]
+# Usage: ./jmeter/scripts/seed-cms-work-items.sh
+#
+# Item counts (default: 100 total, same ~3:2:2 ratio as the original 7-item set):
+#   APPROVE_COUNT=43 REFUSE_COUNT=29 QUERY_COUNT=28 ./jmeter/scripts/seed-cms-work-items.sh
 #
 # Defaults:
 #   MONGO_CONTAINER=epr-register-enrol-mongodb-1
@@ -16,15 +19,46 @@ DATA_DIR="$REPO_ROOT/jmeter/data"
 MONGO_CONTAINER="${MONGO_CONTAINER:-epr-register-enrol-mongodb-1}"
 MONGO_DB="${MONGO_DB:-epr-register-case-management}"
 
-# ---- generate 10 UUIDs (macOS uuidgen; lowercase) --------------------------
+APPROVE_COUNT="${APPROVE_COUNT:-43}"
+REFUSE_COUNT="${REFUSE_COUNT:-29}"
+QUERY_COUNT="${QUERY_COUNT:-28}"
+TOTAL_COUNT=$((APPROVE_COUNT + REFUSE_COUNT + QUERY_COUNT))
+
 gen() { uuidgen | tr '[:upper:]' '[:lower:]'; }
 
-A1=$(gen); A2=$(gen); A3=$(gen)    # approve: England, Scotland, Wales
-R1=$(gen); R2=$(gen)               # refuse: NI, England
-Q1=$(gen); Q2=$(gen)               # query: Wales, Scotland
-W1=$(gen); W2=$(gen); W3=$(gen)   # withdraw: England(submitted), NI(duly-made), Scotland(assessment)
+NATIONS=(England Scotland Wales NorthernIreland)
+MATERIALS=(plastic steel paper glass aluminium wood)
+POSTCODES=("SW1A 1AA" "EH1 1YZ" "CF10 1AB" "BT1 1AA" "M1 1AE" "SA1 1AA" "G1 1AA" "BT48 6HH" "BS1 4DJ" "AB10 1AB")
 
-echo "Seeding 10 work items into $MONGO_CONTAINER/$MONGO_DB …"
+mkdir -p "$DATA_DIR"
+
+# build_group <prefix> <count> <csv_file> -> populates ITEMS_JS (mongo insertMany
+# entries) and writes the matching CSV, cycling nation/material/postcode so a
+# large count still gets realistic, varied data.
+ITEMS_JS=""
+build_group() {
+  local prefix="$1" label="$2" count="$3" csv_file="$4"
+  echo "workItemId,nation,material" > "$csv_file"
+
+  local i nation material postcode id org reg
+  for ((i = 1; i <= count; i++)); do
+    id=$(gen)
+    nation="${NATIONS[$(((i - 1) % ${#NATIONS[@]}))]}"
+    material="${MATERIALS[$(((i - 1) % ${#MATERIALS[@]}))]}"
+    postcode="${POSTCODES[$(((i - 1) % ${#POSTCODES[@]}))]}"
+    org="Perf $label $nation Ltd $(printf '%03d' "$i")"
+    reg="P${prefix}$(printf '%03d' "$i")"
+
+    ITEMS_JS+="item('$id','$org','$material','$postcode','$nation','$reg'),"
+    echo "$id,$nation,$material" >> "$csv_file"
+  done
+}
+
+build_group A Approve "$APPROVE_COUNT" "$DATA_DIR/cms-approve.csv"
+build_group R Refuse "$REFUSE_COUNT" "$DATA_DIR/cms-refuse.csv"
+build_group Q Query "$QUERY_COUNT" "$DATA_DIR/cms-query.csv"
+
+echo "Seeding $TOTAL_COUNT work items into $MONGO_CONTAINER/$MONGO_DB (approve=$APPROVE_COUNT refuse=$REFUSE_COUNT query=$QUERY_COUNT) …"
 
 docker exec "$MONGO_CONTAINER" mongosh --quiet \
   "mongodb://localhost:27017/$MONGO_DB" \
@@ -75,69 +109,16 @@ function item(id, org, material, postcode, nation, reg) {
 }
 
 db.workItems.insertMany([
-  // Approve journey
-  item('$A1', 'Perf Approve England Ltd',   'plastic',   'SW1A 1AA', 'England',         'PA001'),
-  item('$A2', 'Perf Approve Scotland Ltd',  'steel',     'EH1 1YZ',  'Scotland',         'PA002'),
-  item('$A3', 'Perf Approve Wales Ltd',     'paper',     'CF10 1AB', 'Wales',            'PA003'),
-  // Refuse journey
-  item('$R1', 'Perf Refuse NI Ltd',         'glass',     'BT1 1AA',  'NorthernIreland',  'PR001'),
-  item('$R2', 'Perf Refuse England Ltd',    'aluminium', 'M1 1AE',   'England',          'PR002'),
-  // Query journey
-  item('$Q1', 'Perf Query Wales Ltd',       'wood',      'SA1 1AA',  'Wales',            'PQ001'),
-  item('$Q2', 'Perf Query Scotland Ltd',    'plastic',   'G1 1AA',   'Scotland',         'PQ002'),
-  // Withdraw journey
-  item('$W1', 'Perf Withdraw England Ltd',  'steel',     'BS1 4DJ',  'England',          'PW001'),
-  item('$W2', 'Perf Withdraw NI Ltd',       'paper',     'BT48 6HH', 'NorthernIreland',  'PW002'),
-  item('$W3', 'Perf Withdraw Scotland Ltd', 'glass',     'AB10 1AB', 'Scotland',         'PW003'),
+  $ITEMS_JS
 ]);
 
-print('Inserted 10 work items.');
+print('Inserted $TOTAL_COUNT work items.');
 "
-
-# ---- write CSV data files ---------------------------------------------------
-mkdir -p "$DATA_DIR"
-
-cat > "$DATA_DIR/cms-approve.csv" <<EOF
-workItemId,nation,material
-$A1,England,plastic
-$A2,Scotland,steel
-$A3,Wales,paper
-EOF
-
-cat > "$DATA_DIR/cms-refuse.csv" <<EOF
-workItemId,nation,material
-$R1,NorthernIreland,glass
-$R2,England,aluminium
-EOF
-
-cat > "$DATA_DIR/cms-query.csv" <<EOF
-workItemId,nation,material
-$Q1,Wales,wood
-$Q2,Scotland,plastic
-EOF
-
-cat > "$DATA_DIR/cms-withdraw-submitted.csv" <<EOF
-workItemId,nation,material
-$W1,England,steel
-EOF
-
-cat > "$DATA_DIR/cms-withdraw-duly-made.csv" <<EOF
-workItemId,nation,material
-$W2,NorthernIreland,paper
-EOF
-
-cat > "$DATA_DIR/cms-withdraw-assessment.csv" <<EOF
-workItemId,nation,material
-$W3,Scotland,glass
-EOF
 
 echo ""
 echo "CSVs written to $DATA_DIR/"
-echo "  cms-approve.csv               → $A1 (England), $A2 (Scotland), $A3 (Wales)"
-echo "  cms-refuse.csv                → $R1 (NI), $R2 (England)"
-echo "  cms-query.csv                 → $Q1 (Wales), $Q2 (Scotland)"
-echo "  cms-withdraw-submitted.csv    → $W1 (England/submitted)"
-echo "  cms-withdraw-duly-made.csv    → $W2 (NI/duly-made)"
-echo "  cms-withdraw-assessment.csv   → $W3 (Scotland/assessment)"
+echo "  cms-approve.csv  → $APPROVE_COUNT rows"
+echo "  cms-refuse.csv   → $REFUSE_COUNT rows"
+echo "  cms-query.csv    → $QUERY_COUNT rows"
 echo ""
-echo "Run the JMeter test with: CM_PORT=5001 ./run-baseline.sh case-management"
+echo "Run the JMeter test with: LOCAL=true ./run-baseline.sh case-management"

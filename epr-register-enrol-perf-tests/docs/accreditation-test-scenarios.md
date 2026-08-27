@@ -89,7 +89,6 @@
 | **And** | I have submitted the application successfully |
 | **When** | I withdraw the submitted application |
 | **Then** | The application status is set to "Withdrawn" |
-| **And** | A withdrawal confirmation email is sent to the operator |
 | **And** | A withdrawal notification email is sent to the England regulator |
 | **Pass / Fail** | |
 | **Comments** | |
@@ -301,5 +300,75 @@
 | **When** | I complete all review tasks and refuse the application with a reason |
 | **Then** | The application status is set to "Refused" |
 | **And** | A refusal notification email is sent to the operator stating the reason |
+| **Pass / Fail** | |
+| **Comments** | |
+
+---
+
+## Regulator — Sends a query on an accreditation application
+
+---
+
+**TC-REG05 · Exporter application**
+
+| Step | |
+|------|-|
+| **Given** | I am logged in as a regulator using my Entra ID |
+| **And** | I am assigned an accreditation application for an Exporter |
+| **And** | I have reviewed the application details including all uploaded files |
+| **And** | I have queries to raise on the application covering areas such as PRN Tonnage, Business Plan, etc. |
+| **When** | I send the query with all messages to the operator |
+| **Then** | The application status is set to "Queried" |
+| **And** | A query notification email is sent to the operator including the query message |
+| **Pass / Fail** | |
+| **Comments** | |
+
+---
+
+**TC-REG06 · Reprocessor application**
+
+| Step | |
+|------|-|
+| **Given** | I am logged in as a regulator using my Entra ID |
+| **And** | I am assigned an accreditation application for a Reprocessor |
+| **And** | I have reviewed the application details including all uploaded files |
+| **And** | I have queries to raise on the application covering areas such as PRN Tonnage, Business Plan, etc. |
+| **When** | I send the query with all messages to the operator |
+| **Then** | The application status is set to "Queried" |
+| **And** | A query notification email is sent to the operator including the query message |
+| **Pass / Fail** | |
+| **Comments** | |
+
+---
+
+## Operator — Updates an application in Queried state
+
+---
+
+**TC-REG07 · Exporter application**
+
+| Step | |
+|------|-|
+| **Given** | I am an Exporter operator logged in using my Defra ID |
+| **And** | I have an accreditation application that is in "Queried" state |
+| **And** | I can see the query message sent by the regulator |
+| **When** | I update the application on the required tasks identified in the query |
+| **Then** | The application status is set to "Updated" |
+| **And** | The regulator can review the updated application and proceed to approval or refusal |
+| **Pass / Fail** | |
+| **Comments** | |
+
+---
+
+**TC-REG08 · Reprocessor application**
+
+| Step | |
+|------|-|
+| **Given** | I am a Reprocessor operator logged in using my Defra ID |
+| **And** | I have an accreditation application that is in "Queried" state |
+| **And** | I can see the query message sent by the regulator |
+| **When** | I update the application on the required tasks identified in the query |
+| **Then** | The application status is set to "Updated" |
+| **And** | The regulator can review the updated application and proceed to approval or refusal |
 | **Pass / Fail** | |
 | **Comments** | |

@@ -125,6 +125,14 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 JM_REPORTS="$JM_HOME/reports"
 REPORT_NAMES=()
 
+# Tracks the jmeter exit code across plans so it can be propagated as this
+# script's own exit code at the very end, matching the reference entrypoint's
+# `exit $test_exit_code` -- report publishing must still happen first (a
+# non-zero jmeter exit is normal, sample failures, not a broken run), but the
+# final exit code should reflect it so CDP Portal's pass/fail status is
+# accurate rather than always green.
+TEST_EXIT_CODE=0
+
 mkdir -p "$RESULTS_DIR" "$JM_LOGS" "$JM_REPORTS"
 
 run_plan() {
@@ -156,7 +164,7 @@ run_plan() {
     -Jusername="${TEST_USERNAME:-}" \
     -Jpassword="${TEST_PASSWORD:-}" \
     -Japp_id="$APP_ID" \
-    || echo "jmeter exited non-zero for $name (likely sample failures) — continuing to report generation"
+    || { TEST_EXIT_CODE=$?; echo "jmeter exited non-zero ($TEST_EXIT_CODE) for $name (likely sample failures) — continuing to report generation"; }
 
   REPORT_NAMES+=("$name")
   echo "Done: $name — results at $jtl, report at $report_dir"
@@ -171,6 +179,15 @@ run_plan() {
 # refuses to write into a non-empty directory), so this landing page is what
 # satisfies that root-level check while still keeping every plan's full
 # dashboard reachable.
+#
+# Fails loudly (exit 1) on a missing RESULTS_OUTPUT_S3_PATH, a missing
+# index.html, or a failed upload -- matching the base image's own reference
+# entrypoint.sh, which treats all three as fatal. A silent "not uploaded,
+# continuing" here would make a run look green in CDP Portal even though no
+# report was ever published, which is exactly the "tests ran but no report"
+# symptom this whole function exists to fix -- better to have CDP Portal show
+# the run as failed so a missing/misconfigured RESULTS_OUTPUT_S3_PATH is
+# immediately visible instead of silently swallowed.
 publish_reports() {
   if [[ ${#REPORT_NAMES[@]} -eq 0 ]]; then
     echo "No reports were generated — nothing to publish."
@@ -187,8 +204,13 @@ publish_reports() {
   } > "$JM_REPORTS/index.html"
 
   if [[ -z "${RESULTS_OUTPUT_S3_PATH:-}" ]]; then
-    echo "RESULTS_OUTPUT_S3_PATH not set — reports left at $JM_REPORTS, not uploaded."
-    return
+    echo "ERROR: RESULTS_OUTPUT_S3_PATH is not set — reports were generated at $JM_REPORTS but cannot be published for CDP Portal to display them."
+    exit 1
+  fi
+
+  if [[ ! -f "$JM_REPORTS/index.html" ]]; then
+    echo "ERROR: $JM_REPORTS/index.html not found — nothing to publish."
+    exit 1
   fi
 
   echo "Publishing reports to $RESULTS_OUTPUT_S3_PATH …"
@@ -196,6 +218,7 @@ publish_reports() {
     echo "Reports published to $RESULTS_OUTPUT_S3_PATH"
   else
     echo "ERROR: failed to publish reports to $RESULTS_OUTPUT_S3_PATH — reports remain at $JM_REPORTS"
+    exit 1
   fi
 }
 
@@ -231,7 +254,7 @@ case "$PLAN" in
       -Jreprocessor_withdraw_users="${REPROCESSOR_WITHDRAW_USERS:-0}" \
       -Jexporter_withdraw_users="${EXPORTER_WITHDRAW_USERS:-0}" \
       -Jramp_time="${RAMP_TIME:-5}" \
-      || echo "jmeter exited non-zero for $name (likely sample failures) — continuing to report generation"
+      || { TEST_EXIT_CODE=$?; echo "jmeter exited non-zero ($TEST_EXIT_CODE) for $name (likely sample failures) — continuing to report generation"; }
     REPORT_NAMES+=("$name")
     echo "Done: $name — results at $jtl, report at $report_dir"
     ;;
@@ -274,3 +297,5 @@ publish_reports
 
 echo ""
 echo "All done. Raw results in $RESULTS_DIR, HTML report(s) in $JM_REPORTS"
+
+exit "$TEST_EXIT_CODE"

@@ -72,6 +72,26 @@ fi
 # Skip MongoDB seeding when targeting a remote env (no direct DB access)
 CM_SKIP_SEED="${CM_SKIP_SEED:-false}"
 PLAN="${1:-all}"
+
+# Some CDP perf-test runners expect the base image's standard
+# SERVICE_ENDPOINT/SERVICE_PORT/SERVICE_URL_SCHEME variable names (defaulting
+# to a literal "service-name.${ENVIRONMENT}..." placeholder when unset — the
+# "UnknownHostException: service-name..." error). Export them here from the
+# already-correct, dynamically-per-ENVIRONMENT values above, rather than
+# hardcoding a specific environment's hostname anywhere: only the service
+# *name* (epr-register-enrol-frontend / epr-register-enrol-management-fe) is
+# fixed, same as BASE_URL/CM_BASE_URL. Case management targets its own
+# service; everything else targets the operator frontend.
+if [[ "$PLAN" == "case-management" ]]; then
+  export SERVICE_ENDPOINT="$CM_BASE_URL"
+  export SERVICE_PORT="$CM_PORT"
+  export SERVICE_URL_SCHEME="$CM_PROTOCOL"
+else
+  export SERVICE_ENDPOINT="$BASE_URL"
+  export SERVICE_PORT="$PORT"
+  export SERVICE_URL_SCHEME="$PROTOCOL"
+fi
+
 PLANS_DIR="$(dirname "$0")/jmeter/plans"
 RESULTS_DIR="$(dirname "$0")/jmeter/results"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

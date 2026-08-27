@@ -2,26 +2,26 @@
 set -euo pipefail
 
 # Usage:
-#   ENVIRONMENT=staging TEST_USERNAME=user TEST_PASSWORD=pass ./run-baseline.sh [plan]
-#   LOCAL=true ./run-baseline.sh [plan]   # run against localhost (no auth required)
+#   ENVIRONMENT=staging TEST_USERNAME=user TEST_PASSWORD=pass ./entrypoint.sh [plan]
+#   LOCAL=true ./entrypoint.sh [plan]   # run against localhost (no auth required)
 #
 # Case management specific overrides:
 #   In CI/CDP (LOCAL unset), CM_BASE_URL auto-derives from ENVIRONMENT just like
 #   BASE_URL does, e.g. ENVIRONMENT=perf-test ->
 #   epr-register-enrol-management-fe.perf-test.cdp-int.defra.cloud — no need to
 #   pass CM_BASE_URL by hand unless targeting something non-standard:
-#   ENVIRONMENT=perf-test CM_SKIP_SEED=true TEST_USERNAME=user TEST_PASSWORD=pass ./run-baseline.sh case-management
-#   CM_BASE_URL=some-other-host.cdp-int.defra.cloud ./run-baseline.sh case-management   # explicit override
-#   CM_PORT=443 CM_PROTOCOL=https ./run-baseline.sh case-management
+#   ENVIRONMENT=perf-test CM_SKIP_SEED=true TEST_USERNAME=user TEST_PASSWORD=pass ./entrypoint.sh case-management
+#   CM_BASE_URL=some-other-host.cdp-int.defra.cloud ./entrypoint.sh case-management   # explicit override
+#   CM_PORT=443 CM_PROTOCOL=https ./entrypoint.sh case-management
 #   CM_SKIP_SEED=true  # skip MongoDB seeding (use when targeting a remote env)
 #
 # Operator bulk journey overrides (Reprocessor/Exporter, Submit/Withdraw, users + ramp-up):
-#   ./run-baseline.sh operator-bulk                                    # default: 100 users -> Submitted (50 reprocessor + 50 exporter), ramp 2->100 over 5s
+#   ./entrypoint.sh operator-bulk                                    # default: 100 users -> Submitted (50 reprocessor + 50 exporter), ramp 2->100 over 5s
 #   REPROCESSOR_WITHDRAW_USERS=5 EXPORTER_WITHDRAW_USERS=5 \
 #     REPROCESSOR_SUBMIT_USERS=45 EXPORTER_SUBMIT_USERS=45 \
-#     ./run-baseline.sh operator-bulk                                  # 90 -> Submitted, 10 -> Withdrawn
-#   RAMP_TIME=10 ./run-baseline.sh operator-bulk                       # slower ramp
-#   OJ_SKIP_SEED=true ./run-baseline.sh operator-bulk                  # reuse existing CSV rows (they're one-shot; only safe if the previous run didn't consume them all)
+#     ./entrypoint.sh operator-bulk                                  # 90 -> Submitted, 10 -> Withdrawn
+#   RAMP_TIME=10 ./entrypoint.sh operator-bulk                       # slower ramp
+#   OJ_SKIP_SEED=true ./entrypoint.sh operator-bulk                  # reuse existing CSV rows (they're one-shot; only safe if the previous run didn't consume them all)
 #
 # plan: operator | regulator | operator-accreditation | operator-bulk | case-management | all (default: all)
 
@@ -92,7 +92,7 @@ else
   export SERVICE_URL_SCHEME="$PROTOCOL"
 fi
 
-PLANS_DIR="$(dirname "$0")/jmeter/plans"
+PLANS_DIR="$(dirname "$0")/scenarios"
 RESULTS_DIR="$(dirname "$0")/jmeter/results"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 

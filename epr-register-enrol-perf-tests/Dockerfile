@@ -1,12 +1,12 @@
-FROM ghcr.io/defra/cdp-perf-test-docker:latest
+FROM defradigital/cdp-perf-test-docker:latest
 
 WORKDIR /opt/perftest
 
+COPY scenarios/ ./scenarios/
 COPY jmeter/ ./jmeter/
-COPY run-baseline.sh .
-
+COPY entrypoint.sh .
+COPY user.properties .
 
 ENV S3_ENDPOINT=https://s3.eu-west-2.amazonaws.com
-ENV TEST_SCENARIO=epr-register-enrol-fe-perf-tests
 
-ENTRYPOINT [ "./run-baseline.sh", "all" ]
+ENTRYPOINT [ "./entrypoint.sh", "all" ]

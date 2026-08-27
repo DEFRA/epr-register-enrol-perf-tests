@@ -1,0 +1,9 @@
+node_modules
+Dockerfile
+.git
+.github
+.husky
+jmeter.log
+reports/
+jmeter/results/
+report1/

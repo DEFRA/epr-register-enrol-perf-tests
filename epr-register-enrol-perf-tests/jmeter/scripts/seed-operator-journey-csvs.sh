@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate the CSV data files for jmeter/plans/operator-journey-reprocessor-exporter.jmx.
+# Regenerate the CSV data files for scenarios/operator-journey-reprocessor-exporter.jmx.
 #
 # The landing page (GET /operator-accreditation/{org}/{registration}/{material}/{year})
 # gets-or-creates an application keyed on (registrationId, materialType, year) --
@@ -53,6 +53,6 @@ write_csv("operator-journey-exporter-withdraw.csv", withdraw)
 PYEOF
 
 echo ""
-echo "Run with: ./run-baseline.sh operator-bulk"
+echo "Run with: ./entrypoint.sh operator-bulk"
 echo "  (override REPROCESSOR_SUBMIT_USERS / EXPORTER_SUBMIT_USERS / REPROCESSOR_WITHDRAW_USERS /"
 echo "   EXPORTER_WITHDRAW_USERS / RAMP_TIME env vars to change the load profile)"

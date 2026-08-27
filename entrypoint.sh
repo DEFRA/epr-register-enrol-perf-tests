@@ -127,18 +127,25 @@ run_plan() {
   local report_dir="$JM_REPORTS/${name}"
 
   echo "Running: $name → $proto://$base:$port"
+  # A non-zero jmeter exit here (extremely common -- it means at least one
+  # sample failed, not that the run itself broke) must NOT trip set -e and
+  # kill the script before publish_reports() ever runs. The report's whole
+  # purpose is to show which samples failed, so a script that dies here
+  # produces exactly the "tests ran but no report" symptom this is fixing.
   jmeter -n \
     -t "$jmx" \
     -l "$jtl" \
     -j "$log" \
     -e -o "$report_dir" \
+    -f \
     -Jbase_url="$base" \
     -Jport="$port" \
     -Jprotocol="$proto" \
     -Jdata_dir="jmeter/data" \
     -Jusername="${TEST_USERNAME:-}" \
     -Jpassword="${TEST_PASSWORD:-}" \
-    -Japp_id="$APP_ID"
+    -Japp_id="$APP_ID" \
+    || echo "jmeter exited non-zero for $name (likely sample failures) — continuing to report generation"
 
   REPORT_NAMES+=("$name")
   echo "Done: $name — results at $jtl, report at $report_dir"
@@ -174,8 +181,11 @@ publish_reports() {
   fi
 
   echo "Publishing reports to $RESULTS_OUTPUT_S3_PATH …"
-  aws --endpoint-url="${S3_ENDPOINT:-}" s3 cp "$JM_REPORTS" "$RESULTS_OUTPUT_S3_PATH" --recursive
-  echo "Reports published to $RESULTS_OUTPUT_S3_PATH"
+  if aws --endpoint-url="${S3_ENDPOINT:-}" s3 cp "$JM_REPORTS" "$RESULTS_OUTPUT_S3_PATH" --recursive; then
+    echo "Reports published to $RESULTS_OUTPUT_S3_PATH"
+  else
+    echo "ERROR: failed to publish reports to $RESULTS_OUTPUT_S3_PATH — reports remain at $JM_REPORTS"
+  fi
 }
 
 case "$PLAN" in
@@ -200,6 +210,7 @@ case "$PLAN" in
       -l "$jtl" \
       -j "$log" \
       -e -o "$report_dir" \
+      -f \
       -Jbase_url="$BASE_URL" \
       -Jport="$PORT" \
       -Jprotocol="$PROTOCOL" \
@@ -208,7 +219,8 @@ case "$PLAN" in
       -Jexporter_submit_users="${EXPORTER_SUBMIT_USERS:-50}" \
       -Jreprocessor_withdraw_users="${REPROCESSOR_WITHDRAW_USERS:-0}" \
       -Jexporter_withdraw_users="${EXPORTER_WITHDRAW_USERS:-0}" \
-      -Jramp_time="${RAMP_TIME:-5}"
+      -Jramp_time="${RAMP_TIME:-5}" \
+      || echo "jmeter exited non-zero for $name (likely sample failures) — continuing to report generation"
     REPORT_NAMES+=("$name")
     echo "Done: $name — results at $jtl, report at $report_dir"
     ;;

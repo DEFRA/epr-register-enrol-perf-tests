@@ -18,3 +18,10 @@ reports/
 .dolt/
 *.db
 .beads-credential-key
+
+# JMeter perf-test artifacts
+jmeter/results/
+*.jtl
+report-output
+.claude/*
+settings.*

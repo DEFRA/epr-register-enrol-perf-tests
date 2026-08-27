@@ -6,8 +6,12 @@ set -euo pipefail
 #   LOCAL=true ./run-baseline.sh [plan]   # run against localhost (no auth required)
 #
 # Case management specific overrides:
-#   CM_BASE_URL=epr-register-enrol-management-fe.test.cdp-int.defra.cloud ./run-baseline.sh case-management
-#   CM_BASE_URL=epr-register-enrol-management-fe.perf-test.cdp-int.defra.cloud CM_SKIP_SEED=true ./run-baseline.sh case-management
+#   In CI/CDP (LOCAL unset), CM_BASE_URL auto-derives from ENVIRONMENT just like
+#   BASE_URL does, e.g. ENVIRONMENT=perf-test ->
+#   epr-register-enrol-management-fe.perf-test.cdp-int.defra.cloud — no need to
+#   pass CM_BASE_URL by hand unless targeting something non-standard:
+#   ENVIRONMENT=perf-test CM_SKIP_SEED=true TEST_USERNAME=user TEST_PASSWORD=pass ./run-baseline.sh case-management
+#   CM_BASE_URL=some-other-host.cdp-int.defra.cloud ./run-baseline.sh case-management   # explicit override
 #   CM_PORT=443 CM_PROTOCOL=https ./run-baseline.sh case-management
 #   CM_SKIP_SEED=true  # skip MongoDB seeding (use when targeting a remote env)
 #
@@ -42,13 +46,24 @@ else
 fi
 
 # Case management frontend has a different hostname from the operator frontend.
-# Default to localhost:5001 locally; override CM_BASE_URL for remote envs.
-# Example: CM_BASE_URL=epr-register-enrol-management-fe.test.cdp-int.defra.cloud
-CM_BASE_URL="${CM_BASE_URL:-localhost}"
-CM_PORT="${CM_PORT:-5001}"
-CM_PROTOCOL="${CM_PROTOCOL:-http}"
+# Mirrors the BASE_URL logic above: localhost:5001 for LOCAL=true, otherwise
+# auto-derived from ENVIRONMENT (matching the real CDP service name,
+# epr-register-enrol-management-fe) — so a CI/CDP run only needs
+# ENVIRONMENT set, the same as every other plan, rather than requiring
+# CM_BASE_URL to be remembered and passed separately every time.
+# Override CM_BASE_URL explicitly if a run ever needs a different target.
+if [[ "$LOCAL" == "true" ]]; then
+  CM_BASE_URL="${CM_BASE_URL:-localhost}"
+  CM_PORT="${CM_PORT:-5001}"
+  CM_PROTOCOL="${CM_PROTOCOL:-http}"
+else
+  CM_BASE_URL="${CM_BASE_URL:-epr-register-enrol-management-fe.${ENVIRONMENT}.cdp-int.defra.cloud}"
+  CM_PORT="${CM_PORT:-443}"
+  CM_PROTOCOL="${CM_PROTOCOL:-https}"
+fi
 
 # Auto-detect env settings when a remote CM_BASE_URL is provided explicitly
+# (covers LOCAL=true runs that still pass a real CM_BASE_URL by hand)
 if [[ "$CM_BASE_URL" != "localhost" && "$CM_PROTOCOL" == "http" ]]; then
   CM_PORT="443"
   CM_PROTOCOL="https"

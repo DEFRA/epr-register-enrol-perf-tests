@@ -100,7 +100,14 @@ PLANS_DIR="$(dirname "$0")/scenarios"
 RESULTS_DIR="$(dirname "$0")/jmeter/results"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-mkdir -p "$RESULTS_DIR"
+# HTML dashboard reports, matching the reference epr-re-ex-performance-tests
+# entrypoint.sh convention (and this repo's own compose.yml, which already
+# mounts ./reports:/opt/perftest/reports) -- CDP Portal's report page reads
+# from here, not from jmeter/results/*.jtl.
+JM_REPORTS="$(dirname "$0")/reports"
+REPORT_NAMES=()
+
+mkdir -p "$RESULTS_DIR" "$JM_REPORTS"
 
 run_plan() {
   local name="$1"
@@ -110,12 +117,14 @@ run_plan() {
   local jmx="$PLANS_DIR/${name}.jmx"
   local jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
   local log="$RESULTS_DIR/${name}_${TIMESTAMP}.log"
+  local report_dir="$JM_REPORTS/${name}"
 
   echo "Running: $name → $proto://$base:$port"
   jmeter -n \
     -t "$jmx" \
     -l "$jtl" \
     -j "$log" \
+    -e -o "$report_dir" \
     -Jbase_url="$base" \
     -Jport="$port" \
     -Jprotocol="$proto" \
@@ -124,7 +133,42 @@ run_plan() {
     -Jpassword="${TEST_PASSWORD:-}" \
     -Japp_id="$APP_ID"
 
-  echo "Done: $name — results at $jtl"
+  REPORT_NAMES+=("$name")
+  echo "Done: $name — results at $jtl, report at $report_dir"
+}
+
+# Builds a top-level reports/index.html linking every report generated this
+# run, then uploads the whole reports/ tree to S3. CDP Portal's report page
+# specifically looks for an index.html at the root of RESULTS_OUTPUT_S3_PATH
+# (its "No report found" page lists a missing root index.html as one of the
+# three reasons) -- with more than one plan run (e.g. the default "all"),
+# each plan's own dashboard lives in its own subdirectory (jmeter -e -o
+# refuses to write into a non-empty directory), so this landing page is what
+# satisfies that root-level check while still keeping every plan's full
+# dashboard reachable.
+publish_reports() {
+  if [[ ${#REPORT_NAMES[@]} -eq 0 ]]; then
+    echo "No reports were generated — nothing to publish."
+    return
+  fi
+
+  {
+    echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>epr-register-enrol-perf-tests report</title></head><body>"
+    echo "<h1>epr-register-enrol-perf-tests — $TIMESTAMP</h1><ul>"
+    for name in "${REPORT_NAMES[@]}"; do
+      echo "<li><a href=\"${name}/index.html\">${name}</a></li>"
+    done
+    echo "</ul></body></html>"
+  } > "$JM_REPORTS/index.html"
+
+  if [[ -z "${RESULTS_OUTPUT_S3_PATH:-}" ]]; then
+    echo "RESULTS_OUTPUT_S3_PATH not set — reports left at $JM_REPORTS, not uploaded."
+    return
+  fi
+
+  echo "Publishing reports to $RESULTS_OUTPUT_S3_PATH …"
+  aws --endpoint-url="${S3_ENDPOINT:-}" s3 cp "$JM_REPORTS" "$RESULTS_OUTPUT_S3_PATH" --recursive
+  echo "Reports published to $RESULTS_OUTPUT_S3_PATH"
 }
 
 case "$PLAN" in
@@ -142,11 +186,13 @@ case "$PLAN" in
     name="operator-journey-reprocessor-exporter"
     jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
     log="$RESULTS_DIR/${name}_${TIMESTAMP}.log"
+    report_dir="$JM_REPORTS/${name}"
     echo "Running: $name → $PROTOCOL://$BASE_URL:$PORT (ramp ${RAMP_TIME:-5}s)"
     jmeter -n \
       -t "$PLANS_DIR/${name}.jmx" \
       -l "$jtl" \
       -j "$log" \
+      -e -o "$report_dir" \
       -Jbase_url="$BASE_URL" \
       -Jport="$PORT" \
       -Jprotocol="$PROTOCOL" \
@@ -156,7 +202,8 @@ case "$PLAN" in
       -Jreprocessor_withdraw_users="${REPROCESSOR_WITHDRAW_USERS:-0}" \
       -Jexporter_withdraw_users="${EXPORTER_WITHDRAW_USERS:-0}" \
       -Jramp_time="${RAMP_TIME:-5}"
-    echo "Done: $name — results at $jtl"
+    REPORT_NAMES+=("$name")
+    echo "Done: $name — results at $jtl, report at $report_dir"
     ;;
   case-management)
     echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
@@ -193,6 +240,7 @@ case "$PLAN" in
     ;;
 esac
 
+publish_reports
+
 echo ""
-echo "All done. Results in $RESULTS_DIR"
-echo "To generate HTML report: jmeter -g <jtl> -o <output-dir>"
+echo "All done. Raw results in $RESULTS_DIR, HTML report(s) in $JM_REPORTS"

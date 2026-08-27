@@ -24,10 +24,20 @@ set -euo pipefail
 #   OJ_SKIP_SEED=true ./entrypoint.sh operator-bulk                  # reuse existing CSV rows (they're one-shot; only safe if the previous run didn't consume them all)
 #
 # plan: operator | regulator | operator-accreditation | operator-bulk | case-management | all (default: all)
-#   No plan argument needed for normal use — the Dockerfile's ENTRYPOINT
-#   already bakes in "all", which runs operator-accreditation then
-#   case-management, one after the other. operator/regulator/operator-bulk
-#   are only reachable by naming them explicitly.
+#   No plan argument needed for normal use — the Dockerfile's ENTRYPOINT runs
+#   bare, so PLAN defaults to "all", which now just runs
+#   operator-accreditation-journey. case-management is temporarily disabled
+#   (see the commented-out "case-management" case arm and the "all" block
+#   below) while diagnosing CDP Portal's "No report found" issue: every known-
+#   working DEFRA perf-test repo runs exactly one scenario per container
+#   invocation and writes its dashboard straight to $JM_REPORTS (report root),
+#   not a subdirectory. Running two scenarios per invocation meant our root
+#   index.html was a hand-rolled landing page instead of jmeter's own
+#   dashboard output, which may be why CDP Portal didn't recognise it as a
+#   report. Re-enable case-management by uncommenting its case arm and the
+#   "all" block below once single-scenario runs are confirmed working — note
+#   doing so again means restoring per-scenario subdirectories + a landing
+#   page, since jmeter's -o refuses to write into a non-empty directory.
 
 ENVIRONMENT="${ENVIRONMENT:-staging}"
 TEST_USERNAME="${TEST_USERNAME:-}"
@@ -143,9 +153,14 @@ run_plan() {
   local jmx="$JM_SCENARIOS/${name}.jmx"
   local jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
   local log="$JM_LOGS/${name}_${TIMESTAMP}.log"
-  local report_dir="$JM_REPORTS/${name}"
 
   echo "Running: $name → $proto://$base:$port"
+  # -o "$JM_REPORTS" writes jmeter's own dashboard straight to the reports
+  # root, matching the template/reference entrypoint.sh convention exactly
+  # (see the plan-selection comment above) -- only one scenario runs per
+  # invocation now, so there's no subdirectory nesting or synthetic landing
+  # page needed; $JM_REPORTS/index.html is jmeter's real generated dashboard.
+  #
   # A non-zero jmeter exit here (extremely common -- it means at least one
   # sample failed, not that the run itself broke) must NOT trip set -e and
   # kill the script before publish_reports() ever runs. The report's whole
@@ -155,7 +170,7 @@ run_plan() {
     -t "$jmx" \
     -l "$jtl" \
     -j "$log" \
-    -e -o "$report_dir" \
+    -e -o "$JM_REPORTS" \
     -f \
     -Jbase_url="$base" \
     -Jport="$port" \
@@ -167,41 +182,24 @@ run_plan() {
     || { TEST_EXIT_CODE=$?; echo "jmeter exited non-zero ($TEST_EXIT_CODE) for $name (likely sample failures) — continuing to report generation"; }
 
   REPORT_NAMES+=("$name")
-  echo "Done: $name — results at $jtl, report at $report_dir"
+  echo "Done: $name — results at $jtl, report at $JM_REPORTS"
 }
 
-# Builds a top-level reports/index.html linking every report generated this
-# run, then uploads the whole reports/ tree to S3. CDP Portal's report page
-# specifically looks for an index.html at the root of RESULTS_OUTPUT_S3_PATH
-# (its "No report found" page lists a missing root index.html as one of the
-# three reasons) -- with more than one plan run (e.g. the default "all"),
-# each plan's own dashboard lives in its own subdirectory (jmeter -e -o
-# refuses to write into a non-empty directory), so this landing page is what
-# satisfies that root-level check while still keeping every plan's full
-# dashboard reachable.
-#
-# Fails loudly (exit 1) on a missing RESULTS_OUTPUT_S3_PATH, a missing
-# index.html, or a failed upload -- matching the base image's own reference
-# entrypoint.sh, which treats all three as fatal. A silent "not uploaded,
-# continuing" here would make a run look green in CDP Portal even though no
-# report was ever published, which is exactly the "tests ran but no report"
-# symptom this whole function exists to fix -- better to have CDP Portal show
-# the run as failed so a missing/misconfigured RESULTS_OUTPUT_S3_PATH is
-# immediately visible instead of silently swallowed.
+# Uploads the reports/ tree (jmeter's own dashboard, written straight to
+# $JM_REPORTS by -o) to S3 for CDP Portal to display. Fails loudly (exit 1)
+# on a missing RESULTS_OUTPUT_S3_PATH, a missing index.html, or a failed
+# upload -- matching the base image's own reference entrypoint.sh, which
+# treats all three as fatal. A silent "not uploaded, continuing" here would
+# make a run look green in CDP Portal even though no report was ever
+# published, which is exactly the "tests ran but no report" symptom this
+# whole function exists to fix -- better to have CDP Portal show the run as
+# failed so a missing/misconfigured RESULTS_OUTPUT_S3_PATH is immediately
+# visible instead of silently swallowed.
 publish_reports() {
   if [[ ${#REPORT_NAMES[@]} -eq 0 ]]; then
     echo "No reports were generated — nothing to publish."
     return
   fi
-
-  {
-    echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>epr-register-enrol-perf-tests report</title></head><body>"
-    echo "<h1>epr-register-enrol-perf-tests — $TIMESTAMP</h1><ul>"
-    for name in "${REPORT_NAMES[@]}"; do
-      echo "<li><a href=\"${name}/index.html\">${name}</a></li>"
-    done
-    echo "</ul></body></html>"
-  } > "$JM_REPORTS/index.html"
 
   if [[ -z "${RESULTS_OUTPUT_S3_PATH:-}" ]]; then
     echo "ERROR: RESULTS_OUTPUT_S3_PATH is not set — reports were generated at $JM_REPORTS but cannot be published for CDP Portal to display them."
@@ -237,13 +235,12 @@ case "$PLAN" in
     name="operator-journey-reprocessor-exporter"
     jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
     log="$JM_LOGS/${name}_${TIMESTAMP}.log"
-    report_dir="$JM_REPORTS/${name}"
     echo "Running: $name → $PROTOCOL://$BASE_URL:$PORT (ramp ${RAMP_TIME:-5}s)"
     jmeter -n \
       -t "$JM_SCENARIOS/${name}.jmx" \
       -l "$jtl" \
       -j "$log" \
-      -e -o "$report_dir" \
+      -e -o "$JM_REPORTS" \
       -f \
       -Jbase_url="$BASE_URL" \
       -Jport="$PORT" \
@@ -256,39 +253,37 @@ case "$PLAN" in
       -Jramp_time="${RAMP_TIME:-5}" \
       || { TEST_EXIT_CODE=$?; echo "jmeter exited non-zero ($TEST_EXIT_CODE) for $name (likely sample failures) — continuing to report generation"; }
     REPORT_NAMES+=("$name")
-    echo "Done: $name — results at $jtl, report at $report_dir"
+    echo "Done: $name — results at $jtl, report at $JM_REPORTS"
     ;;
-  case-management)
-    echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
-    if [[ "$CM_SKIP_SEED" != "true" ]]; then
-      echo "Seeding work items into local MongoDB…"
-      bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
-    else
-      echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
-    fi
-    run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
-    ;;
+  # case-management)
+  #   echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
+  #   if [[ "$CM_SKIP_SEED" != "true" ]]; then
+  #     echo "Seeding work items into local MongoDB…"
+  #     bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
+  #   else
+  #     echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
+  #   fi
+  #   run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
+  #   ;;
   all)
-    # Default entrypoint (no plan argument needed) — runs both real services
-    # one after the other: operator frontend (epr-register-enrol-frontend),
-    # then case management (epr-register-enrol-management-fe). Deliberately
-    # excludes operator-journey (basic smoke test) and regulator-journey —
-    # neither is one of the two services this suite targets.
-    echo "=== 1/2: Operator accreditation (epr-register-enrol-frontend) ==="
+    # Default entrypoint (no plan argument needed). Currently just an alias
+    # for operator-accreditation-journey -- case-management is temporarily
+    # disabled, see the plan-selection comment near the top of this file.
+    echo "=== Operator accreditation (epr-register-enrol-frontend) ==="
     run_plan "operator-accreditation-journey"
 
-    echo "=== 2/2: Case management (epr-register-enrol-management-fe) ==="
-    echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
-    if [[ "$CM_SKIP_SEED" != "true" ]]; then
-      echo "Seeding work items into local MongoDB…"
-      bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
-    else
-      echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
-    fi
-    run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
+    # echo "=== Case management (epr-register-enrol-management-fe) ==="
+    # echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
+    # if [[ "$CM_SKIP_SEED" != "true" ]]; then
+    #   echo "Seeding work items into local MongoDB…"
+    #   bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
+    # else
+    #   echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
+    # fi
+    # run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
     ;;
   *)
-    echo "Unknown plan: $PLAN. Use: operator | regulator | operator-accreditation | operator-bulk | case-management | all"
+    echo "Unknown plan: $PLAN. Use: operator | regulator | operator-accreditation | operator-bulk | all (case-management is currently disabled, see top of file)"
     exit 1
     ;;
 esac

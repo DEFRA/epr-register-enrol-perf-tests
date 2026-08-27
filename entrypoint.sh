@@ -40,9 +40,16 @@ if [[ "$LOCAL" == "true" ]]; then
   PORT="3000"
   PROTOCOL="http"
 else
+  # TEST_USERNAME/TEST_PASSWORD are NOT required to reach the app — every
+  # journey in this suite authenticates via app-level stub login
+  # (/auth/stub/login), not HTTP Basic Auth. Verified directly: hitting
+  # epr-register-enrol-management-fe.perf-test.cdp-int.defra.cloud with no
+  # credentials at all works fine. Only warn if they're unset, in case some
+  # environment genuinely does sit behind Basic Auth at the edge and these
+  # get wired into a header/auth manager later -- don't hard-fail a run that
+  # doesn't need them.
   if [[ -z "$TEST_USERNAME" || -z "$TEST_PASSWORD" ]]; then
-    echo "ERROR: TEST_USERNAME and TEST_PASSWORD must be set (or use LOCAL=true for localhost)"
-    exit 1
+    echo "WARNING: TEST_USERNAME/TEST_PASSWORD not set — continuing, since stub login doesn't need them. Set LOCAL=true instead if you actually meant to target localhost."
   fi
   BASE_URL="epr-register-enrol-frontend.${ENVIRONMENT}.cdp-int.defra.cloud"
   PORT="443"

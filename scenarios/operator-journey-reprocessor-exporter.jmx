@@ -559,6 +559,14 @@ route to withdraw an application that was never submitted).</stringProp>
                 <stringProp name="Argument.name">newUsesPercent</stringProp>
                 <stringProp name="Argument.value">10</stringProp>
               </elementProp>
+              <!-- otherPercent: 7th category added since this journey was crawled,
+                   see the matching comment in operator-accreditation-journey.jmx;
+                   omitting it fails validation (missing field) and returns 400. -->
+              <elementProp name="otherPercent" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">otherPercent</stringProp>
+                <stringProp name="Argument.value">0</stringProp>
+              </elementProp>
               <elementProp name="submitAction" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.name">submitAction</stringProp>
@@ -1428,6 +1436,14 @@ route to withdraw an application that was never submitted).</stringProp>
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.name">newUsesPercent</stringProp>
                 <stringProp name="Argument.value">10</stringProp>
+              </elementProp>
+              <!-- otherPercent: 7th category added since this journey was crawled,
+                   see the matching comment in operator-accreditation-journey.jmx;
+                   omitting it fails validation (missing field) and returns 400. -->
+              <elementProp name="otherPercent" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">otherPercent</stringProp>
+                <stringProp name="Argument.value">0</stringProp>
               </elementProp>
               <elementProp name="submitAction" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
@@ -2444,6 +2460,14 @@ route to withdraw an application that was never submitted).</stringProp>
                 <stringProp name="Argument.name">newUsesPercent</stringProp>
                 <stringProp name="Argument.value">10</stringProp>
               </elementProp>
+              <!-- otherPercent: 7th category added since this journey was crawled,
+                   see the matching comment in operator-accreditation-journey.jmx;
+                   omitting it fails validation (missing field) and returns 400. -->
+              <elementProp name="otherPercent" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">otherPercent</stringProp>
+                <stringProp name="Argument.value">0</stringProp>
+              </elementProp>
               <elementProp name="submitAction" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.name">submitAction</stringProp>
@@ -3378,6 +3402,14 @@ route to withdraw an application that was never submitted).</stringProp>
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.name">newUsesPercent</stringProp>
                 <stringProp name="Argument.value">10</stringProp>
+              </elementProp>
+              <!-- otherPercent: 7th category added since this journey was crawled,
+                   see the matching comment in operator-accreditation-journey.jmx;
+                   omitting it fails validation (missing field) and returns 400. -->
+              <elementProp name="otherPercent" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">otherPercent</stringProp>
+                <stringProp name="Argument.value">0</stringProp>
               </elementProp>
               <elementProp name="submitAction" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>

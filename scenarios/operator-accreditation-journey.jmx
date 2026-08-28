@@ -4,12 +4,13 @@
 
     <!-- ═══════════════════════════════════════════════════════════
          TEST PLAN
-         Journey: Operator Accreditation (baseline – 1 user, 1 iteration)
+         Journey: Operator Accreditation (users/ramp_time/loops configurable
+         via JMeter properties, default 10 users; see the ThreadGroup below)
          Entry:   /operator-accreditation/{orgId}/{registrationId}/{material}/{year}
          Crawled: localhost:3000  2026-07-12
          ═══════════════════════════════════════════════════════════ -->
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan"
-              testname="Operator Accreditation Journey – Baseline">
+              testname="Operator Accreditation Journey">
       <elementProp name="TestPlan.user_defined_variables"
                    elementType="Arguments" guiclass="ArgumentsPanel">
         <collectionProp name="Arguments.arguments">
@@ -39,14 +40,30 @@
             <stringProp name="Argument.name">MATERIAL_TYPE</stringProp>
             <stringProp name="Argument.value">${__P(material_type,Plastic)}</stringProp>
           </elementProp>
-          <elementProp name="ACCREDITATION_YEAR" elementType="Argument">
-            <stringProp name="Argument.name">ACCREDITATION_YEAR</stringProp>
-            <stringProp name="Argument.value">${__P(accreditation_year,2027)}</stringProp>
+          <!-- YEAR_BASE: evaluated once at test start (User Defined Variables
+               are test-plan-scoped, not per-thread), then combined with
+               __threadNum() at the one point ACCREDITATION_YEAR is actually
+               used (step 03's URL, below) so each concurrent thread lands on
+               a distinct year. The landing page gets-or-creates an
+               application keyed on (registrationId, materialType, year) with
+               no year-range validation; same fixed-org/registration/
+               material, distinct year per thread is exactly how
+               operator-journey-reprocessor-exporter.jmx's CSV-seeded pool
+               keeps concurrent threads from fighting over one application,
+               just without needing a CSV file since only one field varies. -->
+          <elementProp name="YEAR_BASE" elementType="Argument">
+            <stringProp name="Argument.name">YEAR_BASE</stringProp>
+            <stringProp name="Argument.value">${__javaScript(3000 + (Math.floor(new Date().getTime() / 1000) % 5000))}</stringProp>
           </elementProp>
-          <!-- Unique per run: prevents 400 duplicate-email rejection on repeated runs -->
+          <!-- Unique per run AND per thread: prevents 400 duplicate-email
+               rejection both on repeated runs (timestamp) and across
+               concurrent threads sharing the same application... though
+               since each thread now gets its own application (see
+               YEAR_BASE above), this is now belt-and-braces rather than
+               strictly required. -->
           <elementProp name="AUTHORISER_EMAIL" elementType="Argument">
             <stringProp name="Argument.name">AUTHORISER_EMAIL</stringProp>
-            <stringProp name="Argument.value">perf-auth-${__time(yyyyMMddHHmmss)}@test.example</stringProp>
+            <stringProp name="Argument.value">perf-auth-${__time(yyyyMMddHHmmss)}-${__threadNum()}@test.example</stringProp>
           </elementProp>
         </collectionProp>
       </elementProp>
@@ -107,17 +124,23 @@
       <hashTree/>
 
       <!-- ══════════════════════════════════════════════════════════
-           THREAD GROUP  –  1 user, 1 iteration (baseline)
+           THREAD GROUP  –  users/ramp_time/loops configurable via JMeter
+           properties (default 10 users, matching entrypoint.sh's USERS
+           knob; override with -Jusers=100 for the full 10->100 load).
+           Each thread submits a genuinely distinct application (see
+           YEAR_BASE above), so this is safe to run concurrently, unlike
+           blindly raising num_threads on the original 1-user/1-iteration
+           baseline would have been.
            ══════════════════════════════════════════════════════════ -->
       <ThreadGroup enabled="true" guiclass="ThreadGroupGui" testclass="ThreadGroup"
                    testname="Operator Accreditation Journey">
-        <intProp name="ThreadGroup.num_threads">1</intProp>
-        <intProp name="ThreadGroup.ramp_time">1</intProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users,10)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(ramp_time,5)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">stopthread</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">1</stringProp>
+          <stringProp name="LoopController.loops">${__P(loops,1)}</stringProp>
         </elementProp>
       </ThreadGroup>
       <hashTree>
@@ -204,7 +227,7 @@
         <!-- 03 GET operator-accreditation landing -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="03 GET operator-accreditation landing">
-          <stringProp name="HTTPSampler.path">/operator-accreditation/${ORG_ID}/${REGISTRATION_ID}/${MATERIAL_TYPE}/${ACCREDITATION_YEAR}</stringProp>
+          <stringProp name="HTTPSampler.path">/operator-accreditation/${ORG_ID}/${REGISTRATION_ID}/${MATERIAL_TYPE}/${__javaScript(${YEAR_BASE}+${__threadNum()})}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
         </HTTPSamplerProxy>
@@ -564,6 +587,17 @@
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.name">newUsesPercent</stringProp>
                 <stringProp name="Argument.value">10</stringProp>
+              </elementProp>
+              <!-- otherPercent: 7th category (legally-required "other" PRN-income
+                   bucket, see BUSINESS_PLAN_CATEGORY_FIELD_MAP in the frontend
+                   repo) added since this journey was last crawled; omitting it
+                   entirely fails validation (missing field) and returns 400.
+                   Kept at 0 so the sum-to-100 check still passes with the other
+                   six fields unchanged, and no otherDetail is required at step 16. -->
+              <elementProp name="otherPercent" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.name">otherPercent</stringProp>
+                <stringProp name="Argument.value">0</stringProp>
               </elementProp>
               <elementProp name="submitAction" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>

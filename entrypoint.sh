@@ -10,10 +10,11 @@ set -euo pipefail
 #   BASE_URL does, e.g. ENVIRONMENT=perf-test ->
 #   epr-register-enrol-management-fe.perf-test.cdp-int.defra.cloud — no need to
 #   pass CM_BASE_URL by hand unless targeting something non-standard:
-#   ENVIRONMENT=perf-test CM_SKIP_SEED=true TEST_USERNAME=user TEST_PASSWORD=pass ./entrypoint.sh case-management
+#   ENVIRONMENT=perf-test TEST_USERNAME=user TEST_PASSWORD=pass ./entrypoint.sh case-management
 #   CM_BASE_URL=some-other-host.cdp-int.defra.cloud ./entrypoint.sh case-management   # explicit override
 #   CM_PORT=443 CM_PROTOCOL=https ./entrypoint.sh case-management
-#   CM_SKIP_SEED=true  # skip MongoDB seeding (use when targeting a remote env)
+#   CM_SKIP_SEED=true  # skip seeding, reuse existing CSV rows (they're one-shot;
+#                      # only safe if the previous seed run didn't consume them all)
 #
 # Operator bulk journey overrides (Reprocessor/Exporter, Submit/Withdraw, users + ramp-up):
 # This is the plan to use for "N users submitting applications, ramping up" —
@@ -49,8 +50,10 @@ ENVIRONMENT="${ENVIRONMENT:-staging}"
 TEST_USERNAME="${TEST_USERNAME:-}"
 TEST_PASSWORD="${TEST_PASSWORD:-}"
 APP_ID="${APP_ID:-app001}"
-# Top-level users/ramp-up knobs for the operator-bulk plan (see the usage
-# comment above) -- default 10, override with e.g. USERS=100.
+# Top-level users/ramp-up knobs, shared by operator-bulk (see the usage
+# comment above) and operator-accreditation (each thread submits a distinct
+# application, see YEAR_BASE in operator-accreditation-journey.jmx) --
+# default 10, override with e.g. USERS=100.
 USERS="${USERS:-10}"
 RAMP_TIME="${RAMP_TIME:-5}"
 LOCAL="${LOCAL:-false}"
@@ -100,7 +103,13 @@ if [[ "$CM_BASE_URL" != "localhost" && "$CM_PROTOCOL" == "http" ]]; then
   CM_PROTOCOL="https"
 fi
 
-# Skip MongoDB seeding when targeting a remote env (no direct DB access)
+# Seed work items before the case-management run by default; set
+# CM_SKIP_SEED=true to reuse existing CSV rows instead. seed-cms-work-items.sh
+# creates items via a live HTTP POST to the app's own /work-items/
+# re-accreditation/new form (verified working against both local and remote
+# environments -- see the script's own header comment), so this is safe to
+# leave enabled everywhere, unlike the old docker-exec-based version which
+# only worked against a local docker-compose mongo container.
 CM_SKIP_SEED="${CM_SKIP_SEED:-false}"
 
 # CDP Portal's "profile" selector sets a PROFILE env var per triggered run
@@ -174,7 +183,7 @@ run_plan() {
   local jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
   local log="$JM_LOGS/${name}_${TIMESTAMP}.log"
 
-  echo "Running: $name → $proto://$base:$port"
+  echo "Running: $name → $proto://$base:$port ($USERS users, ramp ${RAMP_TIME}s)"
   # -o "$JM_REPORTS" writes jmeter's own dashboard straight to the reports
   # root, matching the template/reference entrypoint.sh convention exactly
   # (see the plan-selection comment above) -- only one scenario runs per
@@ -199,6 +208,8 @@ run_plan() {
     -Jusername="${TEST_USERNAME:-}" \
     -Jpassword="${TEST_PASSWORD:-}" \
     -Japp_id="$APP_ID" \
+    -Jusers="$USERS" \
+    -Jramp_time="$RAMP_TIME" \
     || { TEST_EXIT_CODE=$?; echo "jmeter exited non-zero ($TEST_EXIT_CODE) for $name (likely sample failures) — continuing to report generation"; }
 
   REPORT_NAMES+=("$name")
@@ -282,8 +293,9 @@ case "$PLAN" in
   case-management)
     echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
     if [[ "$CM_SKIP_SEED" != "true" ]]; then
-      echo "Seeding work items into local MongoDB…"
-      bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
+      echo "Seeding work items via $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT …"
+      CM_BASE_URL="$CM_BASE_URL" CM_PORT="$CM_PORT" CM_PROTOCOL="$CM_PROTOCOL" \
+        bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
     else
       echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
     fi

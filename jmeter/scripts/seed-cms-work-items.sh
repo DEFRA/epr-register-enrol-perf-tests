@@ -57,19 +57,54 @@ TOTAL_COUNT=$((APPROVE_COUNT + REFUSE_COUNT + QUERY_COUNT))
 MATERIALS=(plastic steel paper glass aluminium wood)
 NATIONS=(England Scotland Wales NorthernIreland)
 
-# One postcode per nation -- must genuinely resolve to that nation
-# server-side (verified against perf-test: SW1A 1AA -> England). UK postcode
-# area prefixes: SW -> England, EH -> Scotland, CF -> Wales, BT -> NI.
-# (A case statement rather than an associative array -- macOS ships bash 3.2,
-# which predates `declare -A` entirely, and this needs to run identically on
-# a laptop and in whatever bash the container image provides.)
-nation_postcode() {
+# One real, nation-correct postcode OUTWARD code per nation (verified against
+# perf-test: SW1A -> England). UK postcode area prefixes: SW -> England,
+# EH -> Scotland, CF -> Wales, BT -> NI.
+#
+# The INWARD code (the "1AA" half) is synthesised per-item from its index
+# rather than reused fixed -- verified empirically that reusing the exact
+# same full postcode across many creates eventually makes the backend's
+# applicationReference generator fail with "Failed to generate a unique
+# applicationReference after 5 attempts" for THAT postcode specifically, even
+# though the backend itself is healthy and a fresh postcode succeeds
+# immediately. A small hand-picked pool of real postcodes (tried first) still
+# ran out around item #13-20 per nation; a synthetic inward code (also
+# verified working, e.g. "SW1A 9ZZ") gives 10*26*26 = 6,760 combinations per
+# outward code, comfortably covering any realistic seed run size.
+#
+# (Plain functions/case rather than an associative array -- macOS ships bash
+# 3.2, which predates `declare -A` entirely, and this needs to run
+# identically on a laptop and in whatever bash the container image provides.)
+ALPHA="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+nation_outward() {
   case "$1" in
-    England) echo "SW1A 1AA" ;;
-    Scotland) echo "EH1 1YZ" ;;
-    Wales) echo "CF10 1AB" ;;
-    NorthernIreland) echo "BT1 1AA" ;;
+    England) echo "SW1A" ;;
+    Scotland) echo "EH1" ;;
+    Wales) echo "CF10" ;;
+    NorthernIreland) echo "BT1" ;;
   esac
+}
+
+nation_postcode() {
+  local nation="$1" index="$2" outward digit letter_index l1 l2
+  outward="$(nation_outward "$nation")"
+  digit=$((index % 10))
+  letter_index=$(((index / 10) % 676))
+  l1=$((letter_index / 26))
+  l2=$((letter_index % 26))
+  echo "$outward $digit${ALPHA:$l1:1}${ALPHA:$l2:1}"
+}
+
+# Unique-enough string for operatorApplicationId/operatorRegistrationId --
+# deliberately not `uuidgen`: it's not guaranteed present in every container
+# image (the base perf-test image's actual contents aren't something this
+# repo controls or can easily inspect), whereas $$ / $RANDOM / an incrementing
+# counter are plain bash builtins with no external dependency.
+UID_COUNTER=0
+next_uid() {
+  UID_COUNTER=$((UID_COUNTER + 1))
+  echo "$$-${UID_COUNTER}-${RANDOM}"
 }
 
 mkdir -p "$DATA_DIR"
@@ -96,29 +131,53 @@ login_nation() {
 }
 
 # Creates one work item as the given (already-logged-in) nation's caseworker.
-# Echoes the created workItemId on success, nothing on failure.
+# Echoes the created workItemId on success, empty string if every retry
+# failed (build_group's own -z check turns that into a clean error+exit,
+# same as before -- this function's own exit status always stays 0 so a
+# retried-but-ultimately-failed create doesn't trip set -e here first).
+#
+# Retries up to 5 times, rotating to a different postcode from the nation's
+# pool each attempt (see nation_postcode above): verified empirically against
+# perf-test that a REPEATED postcode is what exhausts the backend's
+# applicationReference generator ("Failed to generate a unique
+# applicationReference after 5 attempts"), not backend health or rate --
+# identical requests with only the postcode changed succeed immediately. A
+# large seed run reusing one fixed postcode per nation would eventually hit
+# this and, without a retry here, kill the whole script under set -e before
+# jmeter or publish_reports() ever run -- the actual cause of "no report" for
+# case-management.
 create_item() {
-  local nation="$1" material="$2" org="$3" jar="$JAR_DIR/$nation.txt"
-  local form crumb location uid
+  local nation="$1" material="$2" org="$3" index="$4" jar="$JAR_DIR/$nation.txt"
+  local form crumb location uid attempt
 
-  form=$(curl -sS -c "$jar" -b "$jar" "$BASE/work-items/re-accreditation/new")
-  crumb=$(echo "$form" | extract_crumb)
-  uid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+  location=""
+  for attempt in 1 2 3 4 5; do
+    form=$(curl -sS -c "$jar" -b "$jar" "$BASE/work-items/re-accreditation/new")
+    crumb=$(echo "$form" | extract_crumb)
+    uid=$(next_uid)
 
-  location=$(curl -sS -c "$jar" -b "$jar" -o /dev/null -D - \
-    -X POST "$BASE/work-items/re-accreditation/new" \
-    --data-urlencode "crumb=$crumb" \
-    --data-urlencode "operatorEmail=perf.test@example.com" \
-    --data-urlencode "organisationName=$org" \
-    --data-urlencode "operatorOrganisationId=500001" \
-    --data-urlencode "operatorApplicationId=app-perf-$uid" \
-    --data-urlencode "operatorRegistrationId=reg-perf-$uid" \
-    --data-urlencode "siteAddressLine1=12 Industrial Way" \
-    --data-urlencode "siteAddressTown=Perf Test Town" \
-    --data-urlencode "siteAddressPostcode=$(nation_postcode "$nation")" \
-    --data-urlencode "material=$material" \
-    --data-urlencode "tonnageBand=500-5000" \
-    | grep -i '^location:' | sed -E 's/^[Ll]ocation: *//; s/\r$//')
+    location=$(curl -sS -c "$jar" -b "$jar" -o /dev/null -D - \
+      -X POST "$BASE/work-items/re-accreditation/new" \
+      --data-urlencode "crumb=$crumb" \
+      --data-urlencode "operatorEmail=perf.test@example.com" \
+      --data-urlencode "organisationName=$org" \
+      --data-urlencode "operatorOrganisationId=500001" \
+      --data-urlencode "operatorApplicationId=app-perf-$uid" \
+      --data-urlencode "operatorRegistrationId=reg-perf-$uid" \
+      --data-urlencode "siteAddressLine1=12 Industrial Way" \
+      --data-urlencode "siteAddressTown=Perf Test Town" \
+      --data-urlencode "siteAddressPostcode=$(nation_postcode "$nation" "$((index + attempt))")" \
+      --data-urlencode "material=$material" \
+      --data-urlencode "tonnageBand=500-5000" \
+      | grep -i '^location:' | sed -E 's/^[Ll]ocation: *//; s/\r$//')
+
+    if [[ -n "$location" ]]; then
+      break
+    fi
+
+    echo "  retrying $org (attempt $attempt failed — postcode likely exhausted, rotating) …" >&2
+    sleep 1
+  done
 
   echo "${location##*/}"
 }
@@ -141,7 +200,7 @@ build_group() {
     nation="${NATIONS[$(((i - 1) % ${#NATIONS[@]}))]}"
     material="${MATERIALS[$(((i - 1) % ${#MATERIALS[@]}))]}"
     org="Perf $label $nation Ltd $(printf '%03d' "$i")"
-    id=$(create_item "$nation" "$material" "$org")
+    id=$(create_item "$nation" "$material" "$org" "$i")
     if [[ -z "$id" ]]; then
       echo "ERROR: failed to create item $i/$count for $label ($nation/$material)" >&2
       exit 1

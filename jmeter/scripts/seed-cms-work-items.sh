@@ -112,8 +112,14 @@ mkdir -p "$DATA_DIR"
 JAR_DIR="$(mktemp -d)"
 trap 'rm -rf "$JAR_DIR"' EXIT
 
+# Deliberately avoids `sed -E`/capture groups: this container's base image is
+# Alpine (verified via its public manifest -- ADD alpine-minirootfs...), whose
+# default sed/grep are BusyBox applets, and BusyBox sed's -E (extended
+# regexp) support is a build-time option that isn't guaranteed enabled. grep
+# -o's plain [[:space:]]/[^"]* classes and `cut` are POSIX-basic and don't
+# depend on that.
 extract_crumb() {
-  grep -o 'name="crumb"[[:space:]]*value="[^"]*"' | head -1 | sed -E 's/.*value="([^"]*)".*/\1/'
+  grep -o 'name="crumb"[[:space:]]*value="[^"]*"' | head -1 | cut -d'"' -f4
 }
 
 # Logs in once per nation, as a caseworker scoped to that nation -- the
@@ -169,7 +175,7 @@ create_item() {
       --data-urlencode "siteAddressPostcode=$(nation_postcode "$nation" "$((index + attempt))")" \
       --data-urlencode "material=$material" \
       --data-urlencode "tonnageBand=500-5000" \
-      | grep -i '^location:' | sed -E 's/^[Ll]ocation: *//; s/\r$//')
+      | grep -i '^location:' | head -1 | sed 's/^[Ll]ocation: *//' | tr -d '\r\n')
 
     if [[ -n "$location" ]]; then
       break

@@ -16,33 +16,43 @@ set -euo pipefail
 #   CM_SKIP_SEED=true  # skip MongoDB seeding (use when targeting a remote env)
 #
 # Operator bulk journey overrides (Reprocessor/Exporter, Submit/Withdraw, users + ramp-up):
-#   ./entrypoint.sh operator-bulk                                    # default: 100 users -> Submitted (50 reprocessor + 50 exporter), ramp 2->100 over 5s
+# This is the plan to use for "N users submitting applications, ramping up" —
+# each thread submits a genuinely distinct application via CSV-seeded rows
+# (unlike operator-accreditation, a single-record wizard where concurrent
+# threads would just fight over the same application). USERS is the single
+# top-level knob: it splits evenly across reprocessor/exporter submissions
+# unless REPROCESSOR_SUBMIT_USERS/EXPORTER_SUBMIT_USERS override it directly.
+#   ./entrypoint.sh operator-bulk                                    # default: 10 users -> Submitted (5 reprocessor + 5 exporter), ramped over 5s
+#   USERS=100 ./entrypoint.sh operator-bulk                          # scale up to 100 users -> Submitted (50 reprocessor + 50 exporter), ramped over 5s
 #   REPROCESSOR_WITHDRAW_USERS=5 EXPORTER_WITHDRAW_USERS=5 \
 #     REPROCESSOR_SUBMIT_USERS=45 EXPORTER_SUBMIT_USERS=45 \
-#     ./entrypoint.sh operator-bulk                                  # 90 -> Submitted, 10 -> Withdrawn
+#     ./entrypoint.sh operator-bulk                                  # explicit split overrides USERS: 90 -> Submitted, 10 -> Withdrawn
 #   RAMP_TIME=10 ./entrypoint.sh operator-bulk                       # slower ramp
 #   OJ_SKIP_SEED=true ./entrypoint.sh operator-bulk                  # reuse existing CSV rows (they're one-shot; only safe if the previous run didn't consume them all)
 #
 # plan: operator | regulator | operator-accreditation | operator-bulk | case-management | all (default: all)
-#   No plan argument needed for normal use — the Dockerfile's ENTRYPOINT runs
-#   bare, so PLAN defaults to "all", which now just runs
-#   operator-accreditation-journey. case-management is temporarily disabled
-#   (see the commented-out "case-management" case arm and the "all" block
-#   below) while diagnosing CDP Portal's "No report found" issue: every known-
-#   working DEFRA perf-test repo runs exactly one scenario per container
-#   invocation and writes its dashboard straight to $JM_REPORTS (report root),
-#   not a subdirectory. Running two scenarios per invocation meant our root
-#   index.html was a hand-rolled landing page instead of jmeter's own
-#   dashboard output, which may be why CDP Portal didn't recognise it as a
-#   report. Re-enable case-management by uncommenting its case arm and the
-#   "all" block below once single-scenario runs are confirmed working — note
-#   doing so again means restoring per-scenario subdirectories + a landing
-#   page, since jmeter's -o refuses to write into a non-empty directory.
+#   Selected via PROFILE (CDP Portal) or the positional $1 arg (local/manual
+#   runs). CDP Portal should be configured with two profiles --
+#   PROFILE=operator-accreditation and PROFILE=case-management -- so both
+#   journeys can run "one after the other" as two separate triggered runs,
+#   each producing its own separate, clean report in Portal's run history.
+#   PROFILE unset (or "all") defaults to operator-accreditation-journey.
+#
+#   Every scenario writes its dashboard straight to $JM_REPORTS (the reports
+#   root), matching every known-working DEFRA perf-test repo's convention --
+#   this only works because each plan runs exactly one jmeter invocation per
+#   container invocation (jmeter's -o refuses to write into a non-empty
+#   directory, so chaining two scenarios in one invocation would need
+#   per-scenario subdirectories + a landing page instead).
 
 ENVIRONMENT="${ENVIRONMENT:-staging}"
 TEST_USERNAME="${TEST_USERNAME:-}"
 TEST_PASSWORD="${TEST_PASSWORD:-}"
 APP_ID="${APP_ID:-app001}"
+# Top-level users/ramp-up knobs for the operator-bulk plan (see the usage
+# comment above) -- default 10, override with e.g. USERS=100.
+USERS="${USERS:-10}"
+RAMP_TIME="${RAMP_TIME:-5}"
 LOCAL="${LOCAL:-false}"
 
 if [[ "$LOCAL" == "true" ]]; then
@@ -92,7 +102,17 @@ fi
 
 # Skip MongoDB seeding when targeting a remote env (no direct DB access)
 CM_SKIP_SEED="${CM_SKIP_SEED:-false}"
-PLAN="${1:-all}"
+
+# CDP Portal's "profile" selector sets a PROFILE env var per triggered run
+# (confirmed against DEFRA/epr-re-ex-journey-tests' entrypoint.sh, which reads
+# it the same way) -- it's entirely up to this script how to interpret it.
+# Here PROFILE selects which journey/plan runs, using the exact same values
+# as the positional $1 arg (for local/manual invocation). Two CDP Portal
+# profiles should be configured: PROFILE=operator-accreditation and
+# PROFILE=case-management -- each is its own separate triggered run, so each
+# gets its own clean, separate report in Portal's run history. No need to
+# chain both journeys inside one container invocation.
+PLAN="${PROFILE:-${1:-all}}"
 
 # Some CDP perf-test runners expect the base image's standard
 # SERVICE_ENDPOINT/SERVICE_PORT/SERVICE_URL_SCHEME variable names (defaulting
@@ -235,7 +255,11 @@ case "$PLAN" in
     name="operator-journey-reprocessor-exporter"
     jtl="$RESULTS_DIR/${name}_${TIMESTAMP}.jtl"
     log="$JM_LOGS/${name}_${TIMESTAMP}.log"
-    echo "Running: $name → $PROTOCOL://$BASE_URL:$PORT (ramp ${RAMP_TIME:-5}s)"
+    # USERS splits evenly across reprocessor/exporter submissions unless
+    # REPROCESSOR_SUBMIT_USERS/EXPORTER_SUBMIT_USERS override it directly.
+    reprocessor_submit_default=$((USERS / 2))
+    exporter_submit_default=$((USERS - reprocessor_submit_default))
+    echo "Running: $name → $PROTOCOL://$BASE_URL:$PORT ($USERS users, ramp ${RAMP_TIME}s)"
     jmeter -n \
       -t "$JM_SCENARIOS/${name}.jmx" \
       -l "$jtl" \
@@ -246,44 +270,37 @@ case "$PLAN" in
       -Jport="$PORT" \
       -Jprotocol="$PROTOCOL" \
       -Jdata_dir="jmeter/data" \
-      -Jreprocessor_submit_users="${REPROCESSOR_SUBMIT_USERS:-50}" \
-      -Jexporter_submit_users="${EXPORTER_SUBMIT_USERS:-50}" \
+      -Jreprocessor_submit_users="${REPROCESSOR_SUBMIT_USERS:-$reprocessor_submit_default}" \
+      -Jexporter_submit_users="${EXPORTER_SUBMIT_USERS:-$exporter_submit_default}" \
       -Jreprocessor_withdraw_users="${REPROCESSOR_WITHDRAW_USERS:-0}" \
       -Jexporter_withdraw_users="${EXPORTER_WITHDRAW_USERS:-0}" \
-      -Jramp_time="${RAMP_TIME:-5}" \
+      -Jramp_time="$RAMP_TIME" \
       || { TEST_EXIT_CODE=$?; echo "jmeter exited non-zero ($TEST_EXIT_CODE) for $name (likely sample failures) — continuing to report generation"; }
     REPORT_NAMES+=("$name")
     echo "Done: $name — results at $jtl, report at $JM_REPORTS"
     ;;
-  # case-management)
-  #   echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
-  #   if [[ "$CM_SKIP_SEED" != "true" ]]; then
-  #     echo "Seeding work items into local MongoDB…"
-  #     bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
-  #   else
-  #     echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
-  #   fi
-  #   run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
-  #   ;;
+  case-management)
+    echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
+    if [[ "$CM_SKIP_SEED" != "true" ]]; then
+      echo "Seeding work items into local MongoDB…"
+      bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
+    else
+      echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
+    fi
+    run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
+    ;;
   all)
-    # Default entrypoint (no plan argument needed). Currently just an alias
-    # for operator-accreditation-journey -- case-management is temporarily
-    # disabled, see the plan-selection comment near the top of this file.
+    # Default entrypoint when no PROFILE/plan is given -- just an alias for
+    # operator-accreditation-journey. CDP Portal should instead be configured
+    # with PROFILE=operator-accreditation and PROFILE=case-management as two
+    # separate selectable profiles (see the PLAN resolution comment above),
+    # so both journeys run as independent, separately-reported CDP Portal runs
+    # rather than chained inside a single invocation.
     echo "=== Operator accreditation (epr-register-enrol-frontend) ==="
     run_plan "operator-accreditation-journey"
-
-    # echo "=== Case management (epr-register-enrol-management-fe) ==="
-    # echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
-    # if [[ "$CM_SKIP_SEED" != "true" ]]; then
-    #   echo "Seeding work items into local MongoDB…"
-    #   bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
-    # else
-    #   echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
-    # fi
-    # run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
     ;;
   *)
-    echo "Unknown plan: $PLAN. Use: operator | regulator | operator-accreditation | operator-bulk | all (case-management is currently disabled, see top of file)"
+    echo "Unknown plan: $PLAN. Use: operator | regulator | operator-accreditation | operator-bulk | case-management | all"
     exit 1
     ;;
 esac

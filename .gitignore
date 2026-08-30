@@ -23,6 +23,7 @@ reports/
 jmeter/results/
 *.jtl
 report-output
+logs/
 
 # Local-only Claude Code settings; skills are project-level and stay tracked
 .claude/*

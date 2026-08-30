@@ -31,13 +31,18 @@ set -euo pipefail
 #   RAMP_TIME=10 ./entrypoint.sh operator-bulk                       # slower ramp
 #   OJ_SKIP_SEED=true ./entrypoint.sh operator-bulk                  # reuse existing CSV rows (they're one-shot; only safe if the previous run didn't consume them all)
 #
-# plan: operator | regulator | operator-accreditation | operator-bulk | case-management | all (default: all)
+# plan: operator | regulator | operator-accreditation | accreditation-reprocessor |
+#       accreditation-exporter | operator-bulk | case-management | all (default: all)
 #   Selected via PROFILE (CDP Portal) or the positional $1 arg (local/manual
-#   runs). CDP Portal should be configured with two profiles --
-#   PROFILE=operator-accreditation and PROFILE=case-management -- so both
-#   journeys can run "one after the other" as two separate triggered runs,
-#   each producing its own separate, clean report in Portal's run history.
-#   PROFILE unset (or "all") defaults to operator-accreditation-journey.
+#   runs). accreditation-reprocessor/accreditation-exporter are the dedicated,
+#   single-type successors to operator-accreditation (which mixes both types
+#   via random CSV selection + an If Controller branch) -- each is its own
+#   focused jmx with no branching, matching the app's own task-list split (3
+#   sections for Reprocessor, 5 for Exporter). CDP Portal should be
+#   configured with separate profiles per journey so they run as independent
+#   triggered runs, each producing its own separate, clean report in Portal's
+#   run history. PROFILE unset (or "all") defaults to
+#   operator-accreditation-journey.
 #
 #   Every scenario writes its dashboard straight to $JM_REPORTS (the reports
 #   root), matching every known-working DEFRA perf-test repo's convention --
@@ -254,7 +259,43 @@ publish_reports() {
 case "$PLAN" in
   operator)               run_plan "operator-journey" ;;
   regulator)              run_plan "regulator-journey" ;;
-  operator-accreditation) run_plan "operator-accreditation-journey" ;;
+  operator-accreditation | all)
+    # "all" (the default when no PROFILE/plan is given) is just an alias for
+    # operator-accreditation-journey. CDP Portal should instead be configured
+    # with PROFILE=operator-accreditation and PROFILE=case-management as two
+    # separate selectable profiles (see the PLAN resolution comment above),
+    # so both journeys run as independent, separately-reported CDP Portal runs
+    # rather than chained inside a single invocation.
+    OA_SKIP_SEED="${OA_SKIP_SEED:-false}"
+    if [[ "$OA_SKIP_SEED" != "true" ]]; then
+      echo "Shuffling PerfTest Records fixture pool (Reprocessors + Exporters)…"
+      bash "$JM_HOME/jmeter/scripts/generate-operator-accreditation-fixtures.sh"
+    else
+      echo "Skipping fixture shuffle (OA_SKIP_SEED=true) — reusing existing CSV rows"
+    fi
+    echo "=== Operator accreditation (epr-register-enrol-frontend) ==="
+    run_plan "operator-accreditation-journey"
+    ;;
+  accreditation-reprocessor | accreditation-exporter)
+    # Dedicated, single-type journeys -- split out of operator-accreditation
+    # so each fixture type gets its own focused jmx (3 task sections for
+    # Reprocessor, 5 for Exporter -- see the jmx files' own header comments)
+    # instead of one combined file branching on a CSV `type` column.
+    AC_SKIP_SEED="${AC_SKIP_SEED:-false}"
+    if [[ "$AC_SKIP_SEED" != "true" ]]; then
+      echo "Shuffling PerfTest Records fixture pools (Reprocessors + Exporters)…"
+      bash "$JM_HOME/jmeter/scripts/generate-accreditation-fixtures.sh"
+    else
+      echo "Skipping fixture shuffle (AC_SKIP_SEED=true) — reusing existing CSV rows"
+    fi
+    if [[ "$PLAN" == "accreditation-reprocessor" ]]; then
+      echo "=== Accreditation - Reprocessor (epr-register-enrol-frontend) ==="
+      run_plan "accreditation-reprocessor-journey"
+    else
+      echo "=== Accreditation - Exporter (epr-register-enrol-frontend) ==="
+      run_plan "accreditation-exporter-journey"
+    fi
+    ;;
   operator-bulk)
     OJ_SKIP_SEED="${OJ_SKIP_SEED:-false}"
     if [[ "$OJ_SKIP_SEED" != "true" ]]; then
@@ -301,18 +342,8 @@ case "$PLAN" in
     fi
     run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
     ;;
-  all)
-    # Default entrypoint when no PROFILE/plan is given -- just an alias for
-    # operator-accreditation-journey. CDP Portal should instead be configured
-    # with PROFILE=operator-accreditation and PROFILE=case-management as two
-    # separate selectable profiles (see the PLAN resolution comment above),
-    # so both journeys run as independent, separately-reported CDP Portal runs
-    # rather than chained inside a single invocation.
-    echo "=== Operator accreditation (epr-register-enrol-frontend) ==="
-    run_plan "operator-accreditation-journey"
-    ;;
   *)
-    echo "Unknown plan: $PLAN. Use: operator | regulator | operator-accreditation | operator-bulk | case-management | all"
+    echo "Unknown plan: $PLAN. Use: operator | regulator | operator-accreditation | accreditation-reprocessor | accreditation-exporter | operator-bulk | case-management | all"
     exit 1
     ;;
 esac

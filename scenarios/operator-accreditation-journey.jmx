@@ -4,10 +4,26 @@
 
     <!-- ═══════════════════════════════════════════════════════════
          TEST PLAN
-         Journey: Operator Accreditation (users/ramp_time/loops configurable
-         via JMeter properties, default 10 users; see the ThreadGroup below)
+         Journey: Operator Accreditation, driven against the /operator
+         test-harness page's "PerfTest Records" fixture pool; 100
+         Reprocessor (org 60001-60100) and 100 Exporter (org 61001-61100)
+         fixtures, each with a fixed material and year (2027) baked into its
+         URL (verified against http://localhost:3000/operator). Each thread
+         reads one row (org/registration/material/type) from a pre-shuffled
+         CSV (see generate-operator-accreditation-fixtures.sh), so which
+         fixture a given user lands on is effectively random and no two
+         threads collide on the same one. Exporter rows take an extra
+         overseas-sites branch (see the If Controller after step 22) that
+         Reprocessor rows skip; everything else is identical.
+
+         These 200 fixtures are one-shot: the app correctly rejects
+         re-submitting an already-Submitted application, so once a run
+         consumes a fixture it's gone for good. users/ramp_time/loops
+         configurable via JMeter properties; run with
+         USERS=100 ./entrypoint.sh operator-accreditation for the full
+         1->100 ramp.
          Entry:   /operator-accreditation/{orgId}/{registrationId}/{material}/{year}
-         Crawled: localhost:3000  2026-07-12
+         Crawled: localhost:3000  2026-07-12, PerfTest Records verified 2026-08-30
          ═══════════════════════════════════════════════════════════ -->
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan"
               testname="Operator Accreditation Journey">
@@ -26,41 +42,16 @@
             <stringProp name="Argument.name">PASSWORD</stringProp>
             <stringProp name="Argument.value">${__P(password,)}</stringProp>
           </elementProp>
-          <elementProp name="ORG_ID" elementType="Argument">
-            <stringProp name="Argument.name">ORG_ID</stringProp>
-            <stringProp name="Argument.value">${__P(org_id,50001)}</stringProp>
-          </elementProp>
-          <!-- registrationId replaces siteId – route path changed to
-               /operator-accreditation/{orgId}/{registrationId}/{material}/{year} -->
-          <elementProp name="REGISTRATION_ID" elementType="Argument">
-            <stringProp name="Argument.name">REGISTRATION_ID</stringProp>
-            <stringProp name="Argument.value">${__P(registration_id,aaa000000000000000050001)}</stringProp>
-          </elementProp>
-          <elementProp name="MATERIAL_TYPE" elementType="Argument">
-            <stringProp name="Argument.name">MATERIAL_TYPE</stringProp>
-            <stringProp name="Argument.value">${__P(material_type,Plastic)}</stringProp>
-          </elementProp>
-          <!-- YEAR_BASE: evaluated once at test start (User Defined Variables
-               are test-plan-scoped, not per-thread), then combined with
-               __threadNum() at the one point ACCREDITATION_YEAR is actually
-               used (step 03's URL, below) so each concurrent thread lands on
-               a distinct year. The landing page gets-or-creates an
-               application keyed on (registrationId, materialType, year) with
-               no year-range validation; same fixed-org/registration/
-               material, distinct year per thread is exactly how
-               operator-journey-reprocessor-exporter.jmx's CSV-seeded pool
-               keeps concurrent threads from fighting over one application,
-               just without needing a CSV file since only one field varies. -->
-          <elementProp name="YEAR_BASE" elementType="Argument">
-            <stringProp name="Argument.name">YEAR_BASE</stringProp>
-            <stringProp name="Argument.value">${__javaScript(3000 + (Math.floor(new Date().getTime() / 1000) % 5000))}</stringProp>
+          <elementProp name="DATA_DIR" elementType="Argument">
+            <stringProp name="Argument.name">DATA_DIR</stringProp>
+            <stringProp name="Argument.value">${__P(data_dir,jmeter/data)}</stringProp>
           </elementProp>
           <!-- Unique per run AND per thread: prevents 400 duplicate-email
                rejection both on repeated runs (timestamp) and across
-               concurrent threads sharing the same application... though
-               since each thread now gets its own application (see
-               YEAR_BASE above), this is now belt-and-braces rather than
-               strictly required. -->
+               concurrent threads, since the tonnage-authority "add
+               authoriser" step is per-application, not global, but sharing
+               an email across two DIFFERENT applications submitted in the
+               same second is still worth avoiding. -->
           <elementProp name="AUTHORISER_EMAIL" elementType="Argument">
             <stringProp name="Argument.name">AUTHORISER_EMAIL</stringProp>
             <stringProp name="Argument.value">perf-auth-${__time(yyyyMMddHHmmss)}-${__threadNum()}@test.example</stringProp>
@@ -126,11 +117,12 @@
       <!-- ══════════════════════════════════════════════════════════
            THREAD GROUP  –  users/ramp_time/loops configurable via JMeter
            properties (default 10 users, matching entrypoint.sh's USERS
-           knob; override with -Jusers=100 for the full 10->100 load).
-           Each thread submits a genuinely distinct application (see
-           YEAR_BASE above), so this is safe to run concurrently, unlike
-           blindly raising num_threads on the original 1-user/1-iteration
-           baseline would have been.
+           knob; override with -Jusers=100, or run via
+           USERS=100 ./entrypoint.sh operator-accreditation, for the full
+           1->100 ramp). Each thread claims a distinct fixture from the CSV
+           above, so this is safe to run concurrently, unlike blindly
+           raising num_threads on the original 1-user/1-iteration
+           single-org baseline would have been.
            ══════════════════════════════════════════════════════════ -->
       <ThreadGroup enabled="true" guiclass="ThreadGroupGui" testclass="ThreadGroup"
                    testname="Operator Accreditation Journey">
@@ -144,6 +136,27 @@
         </elementProp>
       </ThreadGroup>
       <hashTree>
+
+        <!-- One row per thread, no recycling: each thread claims a distinct
+             fixture from the pre-shuffled 200-row pool and never revisits
+             it, matching the same CSVDataSet convention already used in
+             operator-journey-reprocessor-exporter.jmx and
+             case-management-journey.jmx. Threads beyond row 200 (more than
+             200 concurrent users) stop cleanly via stopThread rather than
+             erroring or reusing a fixture. -->
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet"
+                    testname="CSV Data: operator-accreditation-fixtures.csv (200 rows)" enabled="true">
+          <stringProp name="filename">${DATA_DIR}/operator-accreditation-fixtures.csv</stringProp>
+          <stringProp name="variableNames">orgId,registrationId,material,type</stringProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="quotedData">true</boolProp>
+          <boolProp name="recycle">false</boolProp>
+          <boolProp name="stopThread">true</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+          <stringProp name="fileEncoding">UTF-8</stringProp>
+          <boolProp name="ignoreFirstLine">true</boolProp>
+        </CSVDataSet>
+        <hashTree/>
 
         <!-- ─────────────────────────────────────────────────────
              SECTION 1 – STUB LOGIN
@@ -227,7 +240,7 @@
         <!-- 03 GET operator-accreditation landing -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="03 GET operator-accreditation landing">
-          <stringProp name="HTTPSampler.path">/operator-accreditation/${ORG_ID}/${REGISTRATION_ID}/${MATERIAL_TYPE}/${__javaScript(${YEAR_BASE}+${__threadNum()})}</stringProp>
+          <stringProp name="HTTPSampler.path">/operator-accreditation/${orgId}/${registrationId}/${material}/2027</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
         </HTTPSamplerProxy>
@@ -485,7 +498,23 @@
           <hashTree/>
         </hashTree>
 
-        <!-- 12 POST tonnage-cya – confirm PRNs section -->
+        <!-- 12 POST tonnage-cya – confirm PRNs section.
+             KNOWN ISSUE (not retried): this step intermittently
+             returns 403 under real concurrent load. Confirmed via source
+             review (accreditationSessionGuard.js + reex-organisation-
+             service.js + stub-operator-orgs.js) that the operator's static
+             Defra ID relationship data DOES include every PerfTest fixture
+             org, so this is a false negative from operatorCanAccessOrganisation's
+             in-memory org-access cache racing under concurrent load, not a
+             real access denial; it's also reproducible with zero
+             concurrency, so it isn't purely a load artifact either. A
+             retry-with-backoff was tried here and measured WORSE at 100-user
+             scale (completion dropped from 43/100 threads to 24, then 15,
+             as retry pressure increased); the extra GET+POST traffic every
+             retry adds appears to worsen the same contention it's trying to
+             recover from, rather than helping. Left un-retried and reverted
+             to this simpler form; the actual fix needs to happen in the
+             app's org-access cache, not the test suite. -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="12 POST tonnage-cya (confirm)">
           <stringProp name="HTTPSampler.path">/accreditation/tonnage-cya/${applicationId}</stringProp>
@@ -819,8 +848,29 @@
         </HTTPSamplerProxy>
         <hashTree/>
 
-        <!-- 21 GET sampling-plan/status (polls CDP uploader; status controller registers
-             the file then follows 302 back to main sampling-plan page when scan complete) -->
+        <!-- 21a reset crumb_token so the while-condition below can't reuse a
+             stale valid-looking value left over from the upload step and skip
+             polling on its very first check -->
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
+                       testname="21a Reset crumb_token before poll">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+
+        <!-- 21 GET sampling-plan/status; polls every 2s (matching the page's
+             own meta-refresh) until scan completes, instead of a single fixed
+             wait: verified against operator-journey-reprocessor-exporter.jmx,
+             which uses this exact pattern at 100-user scale because a fixed
+             5s wait proved insufficient once CDP-uploader is under real
+             concurrent load (the "still scanning" page has no crumb field, so
+             the extractor's CRUMB_NOT_FOUND default is what the loop
+             condition polls on). -->
+        <WhileController guiclass="WhileControllerGui" testclass="WhileController"
+                          testname="21 Poll sampling-plan/status until scan completes">
+          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=12,)}</stringProp>
+        </WhileController>
+        <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="21 GET sampling-plan/status (wait for scan)">
           <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/status</stringProp>
@@ -828,11 +878,9 @@
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
         </HTTPSamplerProxy>
         <hashTree>
-          <!-- 5-second pause: CDP uploader takes ~3s to scan+deliver locally (observed
-               uploadProcessingTime=3038ms); 5s gives a comfortable margin -->
           <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer"
-                         testname="Wait 5s for CDP scan to complete">
-            <stringProp name="ConstantTimer.delay">5000</stringProp>
+                         testname="Wait 2s between polls (matches the page's meta-refresh)">
+            <stringProp name="ConstantTimer.delay">2000</stringProp>
           </ConstantTimer>
           <hashTree/>
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
@@ -845,6 +893,7 @@
             <stringProp name="RegexExtractor.match_no">1</stringProp>
           </RegexExtractor>
           <hashTree/>
+        </hashTree>
         </hashTree>
 
         <!-- 22 POST sampling-plan results – mark section complete (file already
@@ -871,6 +920,449 @@
           </elementProp>
         </HTTPSamplerProxy>
         <hashTree/>
+
+        <!-- ─────────────────────────────────────────────────────
+             SECTION 5b – EXPORTER-ONLY: OVERSEAS SITES
+             Skipped entirely for Reprocessor fixtures (If Controller gated
+             on the CSV's `type` column). Reuses the exact sequence verified
+             in operator-journey-reprocessor-exporter.jmx's Exporter thread
+             group; PerfTest Exporter fixtures already have accredited
+             overseas sites, so this is a straight "continue" through each
+             step, not a new site/evidence submission.
+             ───────────────────────────────────────────────────── -->
+        <IfController guiclass="IfControllerPanel" testclass="IfController"
+                      testname="If Exporter: overseas sites">
+          <stringProp name="IfController.condition">"${type}" == "Exporter"</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+        </IfController>
+        <hashTree>
+
+          <!-- 22b GET select-overseas-sites (Exporter only) -->
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                            testname="22b GET select-overseas-sites (Exporter only)">
+            <stringProp name="HTTPSampler.path">/accreditation/select-overseas-sites/${applicationId}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                               testname="Assert 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="200">200</stringProp>
+              </collectionProp>
+              <intProp name="Assertion.test_type">2</intProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                            testname="Extract crumb_token">
+              <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+              <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+              <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+              <stringProp name="RegexExtractor.match_no">1</stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+
+          <!-- 22c POST select-overseas-sites (continue) -->
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                            testname="22c POST select-overseas-sites (continue)">
+            <stringProp name="HTTPSampler.path">/accreditation/select-overseas-sites/${applicationId}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="crumb" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">true</boolProp>
+                  <stringProp name="Argument.name">crumb</stringProp>
+                  <stringProp name="Argument.value">${crumb_token}</stringProp>
+                </elementProp>
+                <elementProp name="submitAction" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.name">submitAction</stringProp>
+                  <stringProp name="Argument.value">continue</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree/>
+
+          <!-- 22d GET confirm-overseas-sites -->
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                            testname="22d GET confirm-overseas-sites">
+            <stringProp name="HTTPSampler.path">/accreditation/confirm-overseas-sites/${applicationId}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                               testname="Assert 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="200">200</stringProp>
+              </collectionProp>
+              <intProp name="Assertion.test_type">2</intProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                            testname="Extract crumb_token">
+              <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+              <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+              <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+              <stringProp name="RegexExtractor.match_no">1</stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+
+          <!-- 22e POST confirm-overseas-sites (confirm) -->
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                            testname="22e POST confirm-overseas-sites (confirm)">
+            <stringProp name="HTTPSampler.path">/accreditation/confirm-overseas-sites/${applicationId}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="crumb" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">true</boolProp>
+                  <stringProp name="Argument.name">crumb</stringProp>
+                  <stringProp name="Argument.value">${crumb_token}</stringProp>
+                </elementProp>
+                <elementProp name="submitAction" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.name">submitAction</stringProp>
+                  <stringProp name="Argument.value">confirm</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree/>
+
+          <!-- 22f GET upload-evidence-for-overseas-site; also extracts every
+               site's siteId (match_no=-1 -> siteId_1..siteId_n, siteId_matchNr)
+               so the ForEach loop below can visit each one. Some PerfTest
+               Exporter fixtures have EU/OECD sites needing no evidence
+               (operator-journey-reprocessor-exporter.jmx's original "already-
+               accredited, straight continue" assumption), but others have
+               non-EU/non-OECD sites that genuinely require an uploaded
+               evidence file before "continue" succeeds (verified: POST
+               without one returns 400 "incompleteEvidence"). Uploading
+               evidence for every site unconditionally; rather than parsing
+               each site's "required"/"not required" status; is simpler and
+               harmless for sites that didn't strictly need it. -->
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                            testname="22f GET upload-evidence-for-overseas-site">
+            <stringProp name="HTTPSampler.path">/accreditation/upload-evidence-for-overseas-site/${applicationId}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                               testname="Assert 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="200">200</stringProp>
+              </collectionProp>
+              <intProp name="Assertion.test_type">2</intProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                            testname="Extract crumb_token">
+              <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+              <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+              <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+              <stringProp name="RegexExtractor.match_no">1</stringProp>
+            </RegexExtractor>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                            testname="Extract siteId (all sites)">
+              <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+              <stringProp name="RegexExtractor.refname">siteId</stringProp>
+              <stringProp name="RegexExtractor.regex">upload-bes-evidence/[^/]+/(\d+)"</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_no">-1</stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+
+          <!-- ForEach site: upload evidence -> wait for CDP scan -> "no more
+               evidence" -> confirm CYA -> back to the evidence list. Reuses
+               the same multipart/CDP-scan-wait pattern already proven for
+               sampling-plan (steps 19-22 above). -->
+          <ForeachController guiclass="ForeachControlPanel" testclass="ForeachController"
+                              testname="ForEach overseas site: upload evidence">
+            <stringProp name="ForeachController.inputVal">siteId</stringProp>
+            <stringProp name="ForeachController.returnVal">currentSiteId</stringProp>
+            <boolProp name="ForeachController.useSeparator">true</boolProp>
+          </ForeachController>
+          <hashTree>
+
+            <!-- 22f1 GET upload-bes-evidence -->
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                              testname="22f1 GET upload-bes-evidence">
+              <stringProp name="HTTPSampler.path">/accreditation/upload-bes-evidence/${applicationId}/${currentSiteId}</stringProp>
+              <stringProp name="HTTPSampler.method">GET</stringProp>
+              <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            </HTTPSamplerProxy>
+            <hashTree>
+              <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                                 testname="Assert 200">
+                <collectionProp name="Asserion.test_strings">
+                  <stringProp name="200">200</stringProp>
+                </collectionProp>
+                <intProp name="Assertion.test_type">2</intProp>
+                <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              </ResponseAssertion>
+              <hashTree/>
+              <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                              testname="Extract crumb_token">
+                <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+                <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+                <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+                <stringProp name="RegexExtractor.template">$1$</stringProp>
+                <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+                <stringProp name="RegexExtractor.match_no">1</stringProp>
+              </RegexExtractor>
+              <hashTree/>
+            </hashTree>
+
+            <!-- 22f2 POST upload-bes-evidence; upload file (multipart/form-data) -->
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                              testname="22f2 POST upload-bes-evidence (upload file)">
+              <stringProp name="HTTPSampler.path">/accreditation/upload-bes-evidence/${applicationId}/${currentSiteId}</stringProp>
+              <stringProp name="HTTPSampler.method">POST</stringProp>
+              <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+              <boolProp name="HTTPSampler.DO_MULTIPART_POST">true</boolProp>
+              <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+                <collectionProp name="Arguments.arguments">
+                  <elementProp name="crumb" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">true</boolProp>
+                    <stringProp name="Argument.name">crumb</stringProp>
+                    <stringProp name="Argument.value">${crumb_token}</stringProp>
+                  </elementProp>
+                  <elementProp name="action" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                    <stringProp name="Argument.name">action</stringProp>
+                    <stringProp name="Argument.value">uploadFile</stringProp>
+                  </elementProp>
+                  <elementProp name="validFromDay" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                    <stringProp name="Argument.name">validFromDay</stringProp>
+                    <stringProp name="Argument.value">1</stringProp>
+                  </elementProp>
+                  <elementProp name="validFromMonth" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                    <stringProp name="Argument.name">validFromMonth</stringProp>
+                    <stringProp name="Argument.value">1</stringProp>
+                  </elementProp>
+                  <elementProp name="validFromYear" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                    <stringProp name="Argument.name">validFromYear</stringProp>
+                    <stringProp name="Argument.value">2024</stringProp>
+                  </elementProp>
+                </collectionProp>
+              </elementProp>
+              <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
+                <collectionProp name="HTTPFileArgs.files">
+                  <elementProp name="sampling-plan.pdf" elementType="HTTPFileArg">
+                    <stringProp name="File.path">${__P(test_files_dir,jmeter/test-files)}/sampling-plan.pdf</stringProp>
+                    <stringProp name="File.paramname">file</stringProp>
+                    <stringProp name="File.mimetype">application/pdf</stringProp>
+                  </elementProp>
+                </collectionProp>
+              </elementProp>
+            </HTTPSamplerProxy>
+            <hashTree/>
+
+            <!-- 22f2a reset crumb_token so the while-condition below can't
+                 reuse a stale valid-looking value left over from the upload
+                 step and skip polling on its very first check -->
+            <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
+                           testname="22f2a Reset crumb_token before poll">
+              <stringProp name="scriptLanguage">groovy</stringProp>
+              <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+            </JSR223Sampler>
+            <hashTree/>
+
+            <!-- 22f3 GET upload-bes-evidence/status; polls every 2s until the
+                 scan completes, same reasoning and pattern as step 21's
+                 sampling-plan poll above: a single fixed wait is not reliably
+                 enough once CDP-uploader is under real concurrent load
+                 (confirmed here too: the "still scanning" page has no crumb
+                 field, matching status.njk). -->
+            <WhileController guiclass="WhileControllerGui" testclass="WhileController"
+                              testname="22f3 Poll upload-bes-evidence/status until scan completes">
+              <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=12,)}</stringProp>
+            </WhileController>
+            <hashTree>
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                              testname="22f3 GET upload-bes-evidence status (wait for scan)">
+              <stringProp name="HTTPSampler.path">/accreditation/upload-bes-evidence/${applicationId}/${currentSiteId}/status</stringProp>
+              <stringProp name="HTTPSampler.method">GET</stringProp>
+              <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            </HTTPSamplerProxy>
+            <hashTree>
+              <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer"
+                             testname="Wait 2s between polls (matches the page's meta-refresh)">
+                <stringProp name="ConstantTimer.delay">2000</stringProp>
+              </ConstantTimer>
+              <hashTree/>
+              <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                              testname="Extract crumb_token">
+                <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+                <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+                <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+                <stringProp name="RegexExtractor.template">$1$</stringProp>
+                <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+                <stringProp name="RegexExtractor.match_no">1</stringProp>
+              </RegexExtractor>
+              <hashTree/>
+            </hashTree>
+            </hashTree>
+
+            <!-- 22f4 POST upload-more-evidence; "no", one file is enough -->
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                              testname="22f4 POST upload-more-evidence (no)">
+              <stringProp name="HTTPSampler.path">/accreditation/upload-more-evidence/${applicationId}/${currentSiteId}</stringProp>
+              <stringProp name="HTTPSampler.method">POST</stringProp>
+              <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+              <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+                <collectionProp name="Arguments.arguments">
+                  <elementProp name="crumb" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">true</boolProp>
+                    <stringProp name="Argument.name">crumb</stringProp>
+                    <stringProp name="Argument.value">${crumb_token}</stringProp>
+                  </elementProp>
+                  <elementProp name="answer" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                    <stringProp name="Argument.name">answer</stringProp>
+                    <stringProp name="Argument.value">no</stringProp>
+                  </elementProp>
+                </collectionProp>
+              </elementProp>
+            </HTTPSamplerProxy>
+            <hashTree>
+              <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                              testname="Extract crumb_token">
+                <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+                <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+                <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+                <stringProp name="RegexExtractor.template">$1$</stringProp>
+                <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+                <stringProp name="RegexExtractor.match_no">1</stringProp>
+              </RegexExtractor>
+              <hashTree/>
+            </hashTree>
+
+            <!-- 22f5 POST cya-evidence-for-overseas-site; confirm, redirects
+                 back to the evidence list (GET first, matching the app's own
+                 crumb-per-response convention, though the POST controller
+                 itself does not validate any payload beyond the crumb) -->
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                              testname="22f5 GET cya-evidence-for-overseas-site">
+              <stringProp name="HTTPSampler.path">/accreditation/cya-evidence-for-overseas-site/${applicationId}/${currentSiteId}</stringProp>
+              <stringProp name="HTTPSampler.method">GET</stringProp>
+              <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            </HTTPSamplerProxy>
+            <hashTree>
+              <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                                 testname="Assert 200">
+                <collectionProp name="Asserion.test_strings">
+                  <stringProp name="200">200</stringProp>
+                </collectionProp>
+                <intProp name="Assertion.test_type">2</intProp>
+                <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              </ResponseAssertion>
+              <hashTree/>
+              <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                              testname="Extract crumb_token">
+                <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+                <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+                <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+                <stringProp name="RegexExtractor.template">$1$</stringProp>
+                <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+                <stringProp name="RegexExtractor.match_no">1</stringProp>
+              </RegexExtractor>
+              <hashTree/>
+            </hashTree>
+
+            <!-- 22f6 POST cya-evidence-for-overseas-site (confirm) -->
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                              testname="22f6 POST cya-evidence-for-overseas-site (confirm)">
+              <stringProp name="HTTPSampler.path">/accreditation/cya-evidence-for-overseas-site/${applicationId}/${currentSiteId}</stringProp>
+              <stringProp name="HTTPSampler.method">POST</stringProp>
+              <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+              <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+                <collectionProp name="Arguments.arguments">
+                  <elementProp name="crumb" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">true</boolProp>
+                    <stringProp name="Argument.name">crumb</stringProp>
+                    <stringProp name="Argument.value">${crumb_token}</stringProp>
+                  </elementProp>
+                </collectionProp>
+              </elementProp>
+            </HTTPSamplerProxy>
+            <hashTree/>
+
+          </hashTree>
+
+          <!-- 22g GET upload-evidence-for-overseas-site; re-fetch for a fresh
+               crumb after the ForEach loop above (many requests have happened
+               since 22f's crumb was extracted; hapi-crumb rotates every
+               response) -->
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                            testname="22g GET upload-evidence-for-overseas-site (refresh crumb)">
+            <stringProp name="HTTPSampler.path">/accreditation/upload-evidence-for-overseas-site/${applicationId}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                               testname="Assert 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="200">200</stringProp>
+              </collectionProp>
+              <intProp name="Assertion.test_type">2</intProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                            testname="Extract crumb_token">
+              <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+              <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+              <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+              <stringProp name="RegexExtractor.match_no">1</stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+
+          <!-- 22h POST upload-evidence-for-overseas-site (continue) -->
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                            testname="22h POST upload-evidence-for-overseas-site (continue)">
+            <stringProp name="HTTPSampler.path">/accreditation/upload-evidence-for-overseas-site/${applicationId}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="crumb" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">true</boolProp>
+                  <stringProp name="Argument.name">crumb</stringProp>
+                  <stringProp name="Argument.value">${crumb_token}</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree/>
+
+        </hashTree>
 
         <!-- ─────────────────────────────────────────────────────
              SECTION 6 – SUBMIT DECLARATION & CONFIRMATION

@@ -4,61 +4,61 @@
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan"
               testname="Case Management — Re-accreditation Performance Tests" enabled="true">
       <stringProp name="TestPlan.comments">Performance test — re-accreditation work-item lifecycle journeys.
-Pre-seed work items with: jmeter/scripts/seed-cms-work-items.sh
+No pre-seeding: this plan discovers its own work items over HTTP at run time.
 
 Rewritten for app template v12 (RA-410 removed the task-checklist model and the
 withdraw-from-case-management journey; RA-291/RA-337 replaced it with duly-make
 -> self-assign -> log-decision, plus a standalone query endpoint). See
-jmeter/scripts/seed-cms-work-items.sh and case-management-frontend's
-src/server/work-items/re-accreditation/module.js for the authoritative flow.
+case-management-frontend's src/server/work-items/re-accreditation/module.js for
+the authoritative flow.
 
-Load profile: pre-seeded work items, 10 concurrent users (4+3+3 across the 3
-worker-pool thread groups), ramping over 1s to match epr-re-ex-admin-fe-perf-
-tests' own ThreadGroup config (num_threads=10, ramp_time=1, verified directly
-against that repo's scenarios/epr-admin-fe-test.jmx) — effectively an
-near-instant burst to full concurrency rather than a staged ramp.
+Work-item discovery (no CSV files, no seeding step): a Setup Thread Group runs
+once before the 3 worker groups, stub-logs in (nation left blank, so it can see
+every nation's items), then pages through
+GET /work-items?status=submitted&amp;assigneeMode=any&amp;filtersApplied=1 (the
+"Not started" status filter with the "Your applications" assignee filter removed) to
+collect every currently-available work item id via regex on its state-tag
+data-testid. Those ids are shuffled and split ~40/30/30 into three
+ConcurrentLinkedQueue instances stored in JMeter's cross-thread-group `props`
+store (cmsApproveQueue/cmsRefuseQueue/cmsQueryQueue). Each worker thread group
+has a JSR223PreProcessor in place of the old CSVDataSet that polls its own
+queue once per loop iteration and sets ${workItemId}; an empty queue throws
+JMeterStopThreadException, so a thread stops cleanly (same end-of-work
+behaviour CSVDataSet's stopThread=true used to give) once its share is drained.
+This makes the plan self-contained and portable — it works against ANY
+environment (local, perf-test, ...) using whatever real "Not started" work
+items already exist there, without any pre-extraction step or environment-
+specific CSV data.
 
-Each thread group is a worker pool draining its own CSV as a shared queue —
-CSVDataSet has recycle=false/stopThread=true, and the Loop Controller loops each
-thread forever (continue_forever=true) until its group's CSV is exhausted, so
-every row is processed exactly once and threads finish as soon as the queue is
-empty (not all at the same wall-clock time, since group sizes/thread counts
-differ). on_sample_error=continue so one item's failure doesn't stop a worker
-from picking up the next queued item.
+Because discovered items are ones the app itself marked "Not started"
+(genuine submissions via epr-register-enrol-frontend/accreditation-reprocessor
+or accreditation-exporter, not ones created by directly POSTing to case-
+management's own create-work-item form), each one has a real linked operator
+application. That matters for the final decision step: case-management-
+backend's "Log decision" push to the operator-facing backend only succeeds for
+items with a real linked application, so approve/refuse reach genuine terminal
+states here (verified previously via a matching, manually-chained local run —
+68 approved / 10 rejected reached real terminal states), unlike work items
+seeded directly via case-management's own create form.
 
-To change the load profile:
-  1. Work-item counts (must sum to the total you want): regenerate CSVs with
-     APPROVE_COUNT=.. REFUSE_COUNT=.. QUERY_COUNT=.. ./jmeter/scripts/seed-cms-work-items.sh
-  2. Concurrent users / ramp: edit ThreadGroup.num_threads and .ramp_time on
-     each of the 3 Thread Groups below (num_threads must sum to the total users
-     you want, and each group's thread count should not exceed that group's
-     own CSV row count, or the excess threads just stop immediately on an
-     empty queue).
+Load profile: 10 concurrent users (4+3+3 across the 3 worker-pool thread
+groups), ramping over 1s to match epr-re-ex-admin-fe-perf-tests' own
+ThreadGroup config (num_threads=10, ramp_time=1, verified directly against
+that repo's scenarios/epr-admin-fe-test.jmx) — effectively a near-instant
+burst to full concurrency rather than a staged ramp.
 
 Thread Groups (10 users total, ramped over 1s):
-  1. Approval  (4 threads) draining cms-approve.csv
+  1. Approval  (4 threads) draining the discovered approve queue (~40% of found items)
      duly-make -> self-assign (auto: duly-made -> assessment-in-progress) -> decision=approved
-  2. Refusal   (3 threads) draining cms-refuse.csv
+  2. Refusal   (3 threads) draining the discovered refuse queue (~30% of found items)
      duly-make -> self-assign -> decision=rejected
-  3. Query     (3 threads) draining cms-query.csv
+  3. Query     (3 threads) draining the discovered query queue (~30% of found items)
      query (submitted -> queried) via the query-during-duly-making transition
-Total: 10 workers at peak (4+3+3), reached in ~1s.
-
-KNOWN LOCAL LIMITATION: the "Log decision" POST (final step of Approval/Refusal)
-pushes a decision-status-changed notification to the operator-facing backend
-(epr-register-enrol-backend). Work items seeded directly into MongoDB — including
-everything jmeter/scripts/seed-cms-work-items.sh produces — have no matching
-record there, so that push 404s and case-management-backend ABANDONS the decision
-server-side ("No state was changed" in its logs) and returns a plain error-banner
-redirect. The frontend still responds 302 -> 200 on that redirect, so THIS SAMPLER
-SHOWS AS PASSING even though the work item never left assessment-in-progress —
-verified directly against MongoDB after a local run. Duly-make, self-assign and
-query are unaffected and genuinely complete (verified: submitted -> duly-made,
-duly-made -> assessment-in-progress, submitted -> queried). Reaching a real
-Approved/Rejected end state requires the work item to originate from a genuine
-submission through the operator-facing app (epr-register-enrol-frontend), which
-is out of scope for this plan — do not read a green run of this plan as proof
-that approval/refusal actually completed locally.</stringProp>
+Total: 10 workers at peak (4+3+3), reached in ~1s; actual throughput is capped
+by however many "Not started" items are available at discovery time — if fewer
+than 10 are found, some threads stop immediately with nothing queued for them.
+on_sample_error=continue on each worker group so one item's failure doesn't
+stop that worker from picking up its next queued item.</stringProp>
       <boolProp name="TestPlan.functional_mode">false</boolProp>
       <boolProp name="TestPlan.tearDown_on_shutdown">false</boolProp>
       <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
@@ -104,6 +104,133 @@ that approval/refusal actually completed locally.</stringProp>
       </ConfigTestElement>
       <hashTree/>
 
+      <SetupThreadGroup guiclass="SetupThreadGroupGui" testclass="SetupThreadGroup"
+                        testname="Setup: Discover 'Not started' work items" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">stoptest</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController"
+                     guiclass="LoopControlPanel" testclass="LoopController"
+                     testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <intProp name="ThreadGroup.num_threads">1</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+      </SetupThreadGroup>
+      <hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Discover and queue 'Not started' work items" enabled="true">
+        <stringProp name="scriptLanguage">groovy</stringProp>
+        <stringProp name="parameters"></stringProp>
+        <stringProp name="filename"></stringProp>
+        <stringProp name="cacheKey">true</stringProp>
+        <stringProp name="script"><![CDATA[
+import java.util.regex.Pattern
+import java.util.concurrent.ConcurrentLinkedQueue
+
+def base = vars.get("PROTOCOL") + "://" + vars.get("BASE_URL") + ":" + vars.get("PORT")
+def cookies = [:]
+
+def doRequest = { String path, String method, String body ->
+    def conn = (HttpURLConnection) new URL(base + path).openConnection()
+    conn.setRequestMethod(method)
+    conn.setInstanceFollowRedirects(false)
+    conn.setConnectTimeout(10000)
+    conn.setReadTimeout(15000)
+    if (!cookies.isEmpty()) {
+        conn.setRequestProperty("Cookie", cookies.collect { k, v -> k + "=" + v }.join("; "))
+    }
+    if (body != null) {
+        conn.setDoOutput(true)
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+        conn.getOutputStream().write(body.getBytes("UTF-8"))
+    }
+    def status = conn.getResponseCode()
+    def stream = status >= 400 ? conn.getErrorStream() : conn.getInputStream()
+    def respBody = stream == null ? "" : stream.getText("UTF-8")
+    def setCookieHeaders = conn.getHeaderFields().find { k, v -> k != null && k.equalsIgnoreCase("Set-Cookie") }?.value
+    if (setCookieHeaders != null) {
+        setCookieHeaders.each { sc ->
+            def parts = sc.split(";")[0].split("=", 2)
+            if (parts.length == 2) { cookies[parts[0]] = parts[1] }
+        }
+    }
+    return [status: status, body: respBody]
+}
+
+// Stub login (RA-... stub auth) — nation left blank so this session can see
+// and act on 'Not started' work items regardless of which nation they
+// belong to, rather than tracking a per-item nation like the old CSV did.
+def loginPage = doRequest("/auth/stub/login", "GET", null)
+def crumbMatcher = (loginPage.body =~ /name="crumb"\s+value="([^"]+)"/)
+if (!crumbMatcher.find()) {
+    throw new RuntimeException("crumb not found on stub login page (status=" + loginPage.status + ")")
+}
+def crumb = crumbMatcher.group(1)
+
+def loginResp = doRequest("/auth/stub/login", "POST", "crumb=" + URLEncoder.encode(crumb, "UTF-8") + "&nation=")
+if (loginResp.status != 302) {
+    throw new RuntimeException("stub login POST failed, status=" + loginResp.status)
+}
+
+// Page through the work-items list filtered to status=submitted ("Not
+// started" in the UI) with the "Your applications" assignee filter removed
+// (assigneeMode=any), collecting every work item id via its state-tag
+// data-testid, until a page comes back with no matches.
+def idPattern = Pattern.compile('data-testid="work-item-state-tag-([0-9a-fA-F-]+)"')
+def allIds = new LinkedHashSet<String>()
+def page = 1
+while (page <= 50) {
+    def listResp = doRequest("/work-items?status=submitted&assigneeMode=any&filtersApplied=1&page=" + page, "GET", null)
+    def matcher = idPattern.matcher(listResp.body)
+    def foundOnPage = 0
+    while (matcher.find()) {
+        allIds.add(matcher.group(1))
+        foundOnPage++
+    }
+    if (foundOnPage == 0) {
+        break
+    }
+    page++
+}
+
+// Split discovered ids ~40/30/30 across approve/refuse/query, matching the
+// old CSV seed's own default ratio (43/29/28), and hand each thread group
+// its own thread-safe queue via the cross-thread-group `props` store.
+def idsList = new ArrayList<String>(allIds)
+Collections.shuffle(idsList)
+def total = idsList.size()
+def approveCount = (int) Math.round(total * 0.4)
+def refuseCount = (int) Math.round(total * 0.3)
+
+def approveQueue = new ConcurrentLinkedQueue<String>()
+def refuseQueue = new ConcurrentLinkedQueue<String>()
+def queryQueue = new ConcurrentLinkedQueue<String>()
+
+idsList.eachWithIndex { id, idx ->
+    if (idx < approveCount) {
+        approveQueue.add(id)
+    } else if (idx < approveCount + refuseCount) {
+        refuseQueue.add(id)
+    } else {
+        queryQueue.add(id)
+    }
+}
+
+props.put("cmsApproveQueue", approveQueue)
+props.put("cmsRefuseQueue", refuseQueue)
+props.put("cmsQueryQueue", queryQueue)
+
+def summary = "Discovered " + total + " 'Not started' work items -> approve=" + approveQueue.size() + " refuse=" + refuseQueue.size() + " query=" + queryQueue.size()
+log.info(summary)
+SampleResult.setResponseData(summary, "UTF-8")
+SampleResult.setResponseCodeOK()
+SampleResult.setSuccessful(total > 0)
+SampleResult.setResponseMessage(summary)
+]]></stringProp>
+      </JSR223Sampler>
+      <hashTree/>
+      </hashTree>
+
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup"
                    testname="Thread Group 1: Approval Journey — England / Scotland / Wales" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
@@ -118,19 +245,7 @@ that approval/refusal actually completed locally.</stringProp>
         <boolProp name="ThreadGroup.scheduler">false</boolProp>
       </ThreadGroup>
       <hashTree>
-        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-approve.csv (43 rows)" enabled="true">
-        <stringProp name="filename">${DATA_DIR}/cms-approve.csv</stringProp>
-        <stringProp name="variableNames">workItemId,nation,material</stringProp>
-        <stringProp name="delimiter">,</stringProp>
-        <boolProp name="quotedData">true</boolProp>
-        <boolProp name="recycle">false</boolProp>
-        <boolProp name="stopThread">true</boolProp>
-        <stringProp name="shareMode">shareMode.all</stringProp>
-        <stringProp name="fileEncoding">UTF-8</stringProp>
-        <boolProp name="ignoreFirstLine">true</boolProp>
-      </CSVDataSet>
-      <hashTree/>
-      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager"
                      testname="HTTP Cookie Manager" enabled="true">
         <boolProp name="CookieManager.clearEachIteration">true</boolProp>
         <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
@@ -152,6 +267,21 @@ that approval/refusal actually completed locally.</stringProp>
         </elementProp>
       </HTTPSamplerProxy>
       <hashTree>
+        <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Claim next work item: approve queue" enabled="true">
+        <stringProp name="scriptLanguage">groovy</stringProp>
+        <stringProp name="parameters"></stringProp>
+        <stringProp name="filename"></stringProp>
+        <stringProp name="cacheKey">true</stringProp>
+        <stringProp name="script"><![CDATA[
+def queue = props.get("cmsApproveQueue")
+def id = queue == null ? null : queue.poll()
+if (id == null) {
+    throw new org.apache.jorphan.util.JMeterStopThreadException("cmsApproveQueue empty — no more 'Not started' work items to approve")
+}
+vars.put("workItemId", id)
+]]></stringProp>
+      </JSR223PreProcessor>
+      <hashTree/>
         <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                       testname="Extract crumb_token" enabled="true">
         <stringProp name="RegexExtractor.useHeaders">false</stringProp>
@@ -178,7 +308,7 @@ that approval/refusal actually completed locally.</stringProp>
             <elementProp name="nation" elementType="HTTPArgument">
               <boolProp name="HTTPArgument.always_encode">true</boolProp>
               <stringProp name="Argument.name">nation</stringProp>
-              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.value"></stringProp>
               <stringProp name="Argument.metadata">=</stringProp>
             </elementProp>
 
@@ -405,19 +535,7 @@ that approval/refusal actually completed locally.</stringProp>
         <boolProp name="ThreadGroup.scheduler">false</boolProp>
       </ThreadGroup>
       <hashTree>
-        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-refuse.csv (29 rows)" enabled="true">
-        <stringProp name="filename">${DATA_DIR}/cms-refuse.csv</stringProp>
-        <stringProp name="variableNames">workItemId,nation,material</stringProp>
-        <stringProp name="delimiter">,</stringProp>
-        <boolProp name="quotedData">true</boolProp>
-        <boolProp name="recycle">false</boolProp>
-        <boolProp name="stopThread">true</boolProp>
-        <stringProp name="shareMode">shareMode.all</stringProp>
-        <stringProp name="fileEncoding">UTF-8</stringProp>
-        <boolProp name="ignoreFirstLine">true</boolProp>
-      </CSVDataSet>
-      <hashTree/>
-      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager"
                      testname="HTTP Cookie Manager" enabled="true">
         <boolProp name="CookieManager.clearEachIteration">true</boolProp>
         <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
@@ -439,6 +557,21 @@ that approval/refusal actually completed locally.</stringProp>
         </elementProp>
       </HTTPSamplerProxy>
       <hashTree>
+        <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Claim next work item: refuse queue" enabled="true">
+        <stringProp name="scriptLanguage">groovy</stringProp>
+        <stringProp name="parameters"></stringProp>
+        <stringProp name="filename"></stringProp>
+        <stringProp name="cacheKey">true</stringProp>
+        <stringProp name="script"><![CDATA[
+def queue = props.get("cmsRefuseQueue")
+def id = queue == null ? null : queue.poll()
+if (id == null) {
+    throw new org.apache.jorphan.util.JMeterStopThreadException("cmsRefuseQueue empty — no more 'Not started' work items to refuse")
+}
+vars.put("workItemId", id)
+]]></stringProp>
+      </JSR223PreProcessor>
+      <hashTree/>
         <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                       testname="Extract crumb_token" enabled="true">
         <stringProp name="RegexExtractor.useHeaders">false</stringProp>
@@ -465,7 +598,7 @@ that approval/refusal actually completed locally.</stringProp>
             <elementProp name="nation" elementType="HTTPArgument">
               <boolProp name="HTTPArgument.always_encode">true</boolProp>
               <stringProp name="Argument.name">nation</stringProp>
-              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.value"></stringProp>
               <stringProp name="Argument.metadata">=</stringProp>
             </elementProp>
 
@@ -692,19 +825,7 @@ that approval/refusal actually completed locally.</stringProp>
         <boolProp name="ThreadGroup.scheduler">false</boolProp>
       </ThreadGroup>
       <hashTree>
-        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data: cms-query.csv (28 rows)" enabled="true">
-        <stringProp name="filename">${DATA_DIR}/cms-query.csv</stringProp>
-        <stringProp name="variableNames">workItemId,nation,material</stringProp>
-        <stringProp name="delimiter">,</stringProp>
-        <boolProp name="quotedData">true</boolProp>
-        <boolProp name="recycle">false</boolProp>
-        <boolProp name="stopThread">true</boolProp>
-        <stringProp name="shareMode">shareMode.all</stringProp>
-        <stringProp name="fileEncoding">UTF-8</stringProp>
-        <boolProp name="ignoreFirstLine">true</boolProp>
-      </CSVDataSet>
-      <hashTree/>
-      <CookieManager guiclass="CookiePanel" testclass="CookieManager"
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager"
                      testname="HTTP Cookie Manager" enabled="true">
         <boolProp name="CookieManager.clearEachIteration">true</boolProp>
         <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
@@ -726,6 +847,21 @@ that approval/refusal actually completed locally.</stringProp>
         </elementProp>
       </HTTPSamplerProxy>
       <hashTree>
+        <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Claim next work item: query queue" enabled="true">
+        <stringProp name="scriptLanguage">groovy</stringProp>
+        <stringProp name="parameters"></stringProp>
+        <stringProp name="filename"></stringProp>
+        <stringProp name="cacheKey">true</stringProp>
+        <stringProp name="script"><![CDATA[
+def queue = props.get("cmsQueryQueue")
+def id = queue == null ? null : queue.poll()
+if (id == null) {
+    throw new org.apache.jorphan.util.JMeterStopThreadException("cmsQueryQueue empty — no more 'Not started' work items to query")
+}
+vars.put("workItemId", id)
+]]></stringProp>
+      </JSR223PreProcessor>
+      <hashTree/>
         <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                       testname="Extract crumb_token" enabled="true">
         <stringProp name="RegexExtractor.useHeaders">false</stringProp>
@@ -752,7 +888,7 @@ that approval/refusal actually completed locally.</stringProp>
             <elementProp name="nation" elementType="HTTPArgument">
               <boolProp name="HTTPArgument.always_encode">true</boolProp>
               <stringProp name="Argument.name">nation</stringProp>
-              <stringProp name="Argument.value">${nation}</stringProp>
+              <stringProp name="Argument.value"></stringProp>
               <stringProp name="Argument.metadata">=</stringProp>
             </elementProp>
 

@@ -13,8 +13,11 @@ set -euo pipefail
 #   ENVIRONMENT=perf-test TEST_USERNAME=user TEST_PASSWORD=pass ./entrypoint.sh case-management
 #   CM_BASE_URL=some-other-host.cdp-int.defra.cloud ./entrypoint.sh case-management   # explicit override
 #   CM_PORT=443 CM_PROTOCOL=https ./entrypoint.sh case-management
-#   CM_SKIP_SEED=true  # skip seeding, reuse existing CSV rows (they're one-shot;
-#                      # only safe if the previous seed run didn't consume them all)
+#   No seeding step and no CSV data files: case-management-journey.jmx
+#   discovers its own "Not started" work items over HTTP at run time (see
+#   the jmx's own TestPlan.comments for how), so this plan works against
+#   whatever real submitted-but-undecided items already exist in the target
+#   environment -- there is nothing to pre-seed or skip-seed.
 #
 # Operator bulk journey overrides (Reprocessor/Exporter, Submit/Withdraw, users + ramp-up):
 # This is the plan to use for "N users submitting applications, ramping up" —
@@ -112,14 +115,6 @@ if [[ "$CM_BASE_URL" != "localhost" && "$CM_PROTOCOL" == "http" ]]; then
   CM_PROTOCOL="https"
 fi
 
-# Seed work items before the case-management run by default; set
-# CM_SKIP_SEED=true to reuse existing CSV rows instead. seed-cms-work-items.sh
-# creates items via a live HTTP POST to the app's own /work-items/
-# re-accreditation/new form (verified working against both local and remote
-# environments -- see the script's own header comment), so this is safe to
-# leave enabled everywhere, unlike the old docker-exec-based version which
-# only worked against a local docker-compose mongo container.
-CM_SKIP_SEED="${CM_SKIP_SEED:-false}"
 
 # CDP Portal's "profile" selector sets a PROFILE env var per triggered run
 # (confirmed against DEFRA/epr-re-ex-journey-tests' entrypoint.sh, which reads
@@ -337,13 +332,14 @@ case "$PLAN" in
     ;;
   case-management)
     echo "Case management target: $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT"
-    if [[ "$CM_SKIP_SEED" != "true" ]]; then
-      echo "Seeding work items via $CM_PROTOCOL://$CM_BASE_URL:$CM_PORT …"
-      CM_BASE_URL="$CM_BASE_URL" CM_PORT="$CM_PORT" CM_PROTOCOL="$CM_PROTOCOL" \
-        bash "$JM_HOME/jmeter/scripts/seed-cms-work-items.sh"
-    else
-      echo "Skipping seed (CM_SKIP_SEED=true) — using existing work item IDs from CSV files"
-    fi
+    # No seeding step: case-management-journey.jmx now discovers its own
+    # work items over HTTP at run time (its Setup Thread Group logs in and
+    # pages through /work-items?status=submitted, the "Not started" filter,
+    # to find real, already-existing items rather than reading CSV rows or
+    # creating disconnected ones via seed-cms-work-items.sh). Running that
+    # seed script here would just pollute the discoverable pool with
+    # unlinked items whose decision step is known to fail (see the jmx's
+    # own TestPlan.comments), so it is deliberately not called at all.
     run_plan "case-management-journey" "$CM_BASE_URL" "$CM_PORT" "$CM_PROTOCOL"
     ;;
   *)

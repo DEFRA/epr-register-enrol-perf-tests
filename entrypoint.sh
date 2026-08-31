@@ -23,8 +23,8 @@ set -euo pipefail
 # threads would just fight over the same application). USERS is the single
 # top-level knob: it splits evenly across reprocessor/exporter submissions
 # unless REPROCESSOR_SUBMIT_USERS/EXPORTER_SUBMIT_USERS override it directly.
-#   ./entrypoint.sh operator-bulk                                    # default: 50 users -> Submitted (25 reprocessor + 25 exporter), ramped over 15s
-#   USERS=100 ./entrypoint.sh operator-bulk                          # scale up to 100 users -> Submitted (50 reprocessor + 50 exporter), ramped over 15s
+#   ./entrypoint.sh operator-bulk                                    # default: 50 users -> Submitted (25 reprocessor + 25 exporter), ramped over 1s
+#   USERS=100 ./entrypoint.sh operator-bulk                          # scale up to 100 users -> Submitted (50 reprocessor + 50 exporter), ramped over 1s
 #   REPROCESSOR_WITHDRAW_USERS=5 EXPORTER_WITHDRAW_USERS=5 \
 #     REPROCESSOR_SUBMIT_USERS=45 EXPORTER_SUBMIT_USERS=45 \
 #     ./entrypoint.sh operator-bulk                                  # explicit split overrides USERS: 90 -> Submitted, 10 -> Withdrawn
@@ -58,11 +58,13 @@ APP_ID="${APP_ID:-app001}"
 # Top-level users/ramp-up knobs, shared by operator-bulk (see the usage
 # comment above) and operator-accreditation (each thread submits a distinct
 # application, see YEAR_BASE in operator-accreditation-journey.jmx) --
-# default 50 users / 15s ramp, matching the reference epr-re-ex-performance-
-# tests' observed peak concurrency (~49-50 active threads, reached within
-# its first 1-minute sample bucket); override with e.g. USERS=100.
+# default 50 users / 1s ramp, matching the reference epr-re-ex-performance-
+# tests' entrypoint.sh + epr-re-ex-test.jmx exactly: THREAD_COUNT=50 for its
+# default (non max/mid) PROFILE, and every ThreadGroup in that jmx hardcodes
+# ThreadGroup.ramp_time=1 (verified directly against that repo's source, not
+# inferred from its dashboard chart); override with e.g. USERS=100.
 USERS="${USERS:-50}"
-RAMP_TIME="${RAMP_TIME:-15}"
+RAMP_TIME="${RAMP_TIME:-1}"
 LOCAL="${LOCAL:-false}"
 
 if [[ "$LOCAL" == "true" ]]; then

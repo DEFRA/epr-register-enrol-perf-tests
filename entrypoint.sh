@@ -59,7 +59,7 @@ APP_ID="${APP_ID:-app001}"
 # comment above) and operator-accreditation (each thread submits a distinct
 # application, see YEAR_BASE in operator-accreditation-journey.jmx) --
 # default 10, override with e.g. USERS=100.
-USERS="${USERS:-10}"
+USERS="${USERS:-50}"
 RAMP_TIME="${RAMP_TIME:-5}"
 LOCAL="${LOCAL:-false}"
 

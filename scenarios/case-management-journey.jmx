@@ -12,14 +12,11 @@ withdraw-from-case-management journey; RA-291/RA-337 replaced it with duly-make
 jmeter/scripts/seed-cms-work-items.sh and case-management-frontend's
 src/server/work-items/re-accreditation/module.js for the authoritative flow.
 
-Load profile: 100 pre-seeded work items, ramping 2 -> 10 concurrent users over 16s.
-Each of the 3 thread groups starts its first thread at t=0 (3 threads active
-immediately — the "starts at 2" end of the ramp) and stages the rest of its
-threads evenly across ThreadGroup.ramp_time=16s, so combined concurrency climbs
-from ~3 workers to the full 10 by t=16s and then holds at 10 while the queues
-drain (stock JMeter has no built-in "start at N, climb to M" thread group, so
-this staggered-start-per-group approach is the standard idiom for a visible
-ramp rather than an instant burst to peak concurrency).
+Load profile: pre-seeded work items, 10 concurrent users (4+3+3 across the 3
+worker-pool thread groups), ramping over 1s to match epr-re-ex-admin-fe-perf-
+tests' own ThreadGroup config (num_threads=10, ramp_time=1, verified directly
+against that repo's scenarios/epr-admin-fe-test.jmx) — effectively an
+near-instant burst to full concurrency rather than a staged ramp.
 
 Each thread group is a worker pool draining its own CSV as a shared queue —
 CSVDataSet has recycle=false/stopThread=true, and the Loop Controller loops each
@@ -38,14 +35,14 @@ To change the load profile:
      own CSV row count, or the excess threads just stop immediately on an
      empty queue).
 
-Thread Groups (ramping 2->10 users total over 16s):
-  1. Approval  (4 threads) draining cms-approve.csv (43 rows)
+Thread Groups (10 users total, ramped over 1s):
+  1. Approval  (4 threads) draining cms-approve.csv
      duly-make -> self-assign (auto: duly-made -> assessment-in-progress) -> decision=approved
-  2. Refusal   (3 threads) draining cms-refuse.csv (29 rows)
+  2. Refusal   (3 threads) draining cms-refuse.csv
      duly-make -> self-assign -> decision=rejected
-  3. Query     (3 threads) draining cms-query.csv (28 rows)
+  3. Query     (3 threads) draining cms-query.csv
      query (submitted -> queried) via the query-during-duly-making transition
-Total: 100 pre-seeded work items, 10 workers at peak (4+3+3), ramped from 2-3.
+Total: 10 workers at peak (4+3+3), reached in ~1s.
 
 KNOWN LOCAL LIMITATION: the "Log decision" POST (final step of Approval/Refusal)
 pushes a decision-status-changed notification to the operator-facing backend
@@ -117,7 +114,7 @@ that approval/refusal actually completed locally.</stringProp>
           <intProp name="LoopController.loops">-1</intProp>
         </elementProp>
         <intProp name="ThreadGroup.num_threads">4</intProp>
-        <intProp name="ThreadGroup.ramp_time">16</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
         <boolProp name="ThreadGroup.scheduler">false</boolProp>
       </ThreadGroup>
       <hashTree>
@@ -404,7 +401,7 @@ that approval/refusal actually completed locally.</stringProp>
           <intProp name="LoopController.loops">-1</intProp>
         </elementProp>
         <intProp name="ThreadGroup.num_threads">3</intProp>
-        <intProp name="ThreadGroup.ramp_time">16</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
         <boolProp name="ThreadGroup.scheduler">false</boolProp>
       </ThreadGroup>
       <hashTree>
@@ -691,7 +688,7 @@ that approval/refusal actually completed locally.</stringProp>
           <intProp name="LoopController.loops">-1</intProp>
         </elementProp>
         <intProp name="ThreadGroup.num_threads">3</intProp>
-        <intProp name="ThreadGroup.ramp_time">16</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
         <boolProp name="ThreadGroup.scheduler">false</boolProp>
       </ThreadGroup>
       <hashTree>

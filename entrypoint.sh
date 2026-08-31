@@ -58,8 +58,8 @@ APP_ID="${APP_ID:-app001}"
 # Top-level users/ramp-up knobs, shared by operator-bulk (see the usage
 # comment above) and operator-accreditation (each thread submits a distinct
 # application, see YEAR_BASE in operator-accreditation-journey.jmx) --
-# default 10, override with e.g. USERS=100.
-USERS="${USERS:-10}"
+# default 50, override with e.g. USERS=100.
+USERS="${USERS:-50}"
 RAMP_TIME="${RAMP_TIME:-5}"
 LOCAL="${LOCAL:-false}"
 

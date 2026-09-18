@@ -784,7 +784,7 @@ route to withdraw an application that was never submitted).</stringProp>
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=12,)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -811,6 +811,59 @@ route to withdraw an application that was never submitted).</stringProp>
           <hashTree/>
         </hashTree>
         </hashTree>
+        <!-- 21b GET sampling-plan results - verify the CDP scan actually completed.
+             The poll loop above exits as soon as ANY crumb appears, which is also true
+             of /results?upload=failed, and the loop can simply exhaust its budget while
+             the file is still scanning. Either way step 22 used to fail as a bare 400
+             ("You must upload at least one file before continuing") with no clue why.
+             Asserting here names the real cause and refreshes the crumb from a page we
+             have actually verified. -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                          testname="21b GET sampling-plan results (verify scan completed)">
+          <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/results</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert scan completed (uploaded file is listed)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="uploaded_files_table">data-testid="uploaded-files-table"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">16</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert upload not rejected (no error summary)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="no_error_summary">data-testid="error-summary"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">20</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract crumb_token">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+            <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
+        </hashTree>
+
         <!-- 22 POST sampling-plan results (mark complete) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="22 POST sampling-plan results (mark complete)">
@@ -1662,7 +1715,7 @@ route to withdraw an application that was never submitted).</stringProp>
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=12,)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -1689,6 +1742,59 @@ route to withdraw an application that was never submitted).</stringProp>
           <hashTree/>
         </hashTree>
         </hashTree>
+        <!-- 21b GET sampling-plan results - verify the CDP scan actually completed.
+             The poll loop above exits as soon as ANY crumb appears, which is also true
+             of /results?upload=failed, and the loop can simply exhaust its budget while
+             the file is still scanning. Either way step 22 used to fail as a bare 400
+             ("You must upload at least one file before continuing") with no clue why.
+             Asserting here names the real cause and refreshes the crumb from a page we
+             have actually verified. -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                          testname="21b GET sampling-plan results (verify scan completed)">
+          <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/results</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert scan completed (uploaded file is listed)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="uploaded_files_table">data-testid="uploaded-files-table"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">16</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert upload not rejected (no error summary)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="no_error_summary">data-testid="error-summary"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">20</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract crumb_token">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+            <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
+        </hashTree>
+
         <!-- 22 POST sampling-plan results (mark complete) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="22 POST sampling-plan results (mark complete)">
@@ -2685,7 +2791,7 @@ route to withdraw an application that was never submitted).</stringProp>
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=12,)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -2712,6 +2818,59 @@ route to withdraw an application that was never submitted).</stringProp>
           <hashTree/>
         </hashTree>
         </hashTree>
+        <!-- 21b GET sampling-plan results - verify the CDP scan actually completed.
+             The poll loop above exits as soon as ANY crumb appears, which is also true
+             of /results?upload=failed, and the loop can simply exhaust its budget while
+             the file is still scanning. Either way step 22 used to fail as a bare 400
+             ("You must upload at least one file before continuing") with no clue why.
+             Asserting here names the real cause and refreshes the crumb from a page we
+             have actually verified. -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                          testname="21b GET sampling-plan results (verify scan completed)">
+          <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/results</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert scan completed (uploaded file is listed)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="uploaded_files_table">data-testid="uploaded-files-table"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">16</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert upload not rejected (no error summary)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="no_error_summary">data-testid="error-summary"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">20</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract crumb_token">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+            <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
+        </hashTree>
+
         <!-- 22 POST sampling-plan results (mark complete) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="22 POST sampling-plan results (mark complete)">
@@ -3628,7 +3787,7 @@ route to withdraw an application that was never submitted).</stringProp>
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=12,)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -3655,6 +3814,59 @@ route to withdraw an application that was never submitted).</stringProp>
           <hashTree/>
         </hashTree>
         </hashTree>
+        <!-- 21b GET sampling-plan results - verify the CDP scan actually completed.
+             The poll loop above exits as soon as ANY crumb appears, which is also true
+             of /results?upload=failed, and the loop can simply exhaust its budget while
+             the file is still scanning. Either way step 22 used to fail as a bare 400
+             ("You must upload at least one file before continuing") with no clue why.
+             Asserting here names the real cause and refreshes the crumb from a page we
+             have actually verified. -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                          testname="21b GET sampling-plan results (verify scan completed)">
+          <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/results</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert scan completed (uploaded file is listed)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="uploaded_files_table">data-testid="uploaded-files-table"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">16</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert upload not rejected (no error summary)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="no_error_summary">data-testid="error-summary"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">20</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract crumb_token">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+            <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
+        </hashTree>
+
         <!-- 22 POST sampling-plan results (mark complete) -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="22 POST sampling-plan results (mark complete)">

@@ -864,7 +864,7 @@
         <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                        testname="21a Reset crumb_token before poll">
           <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
         </JSR223Sampler>
         <hashTree/>
 
@@ -873,12 +873,10 @@
              wait: verified against operator-journey-reprocessor-exporter.jmx,
              which uses this exact pattern at 100-user scale because a fixed
              5s wait proved insufficient once CDP-uploader is under real
-             concurrent load (the "still scanning" page has no crumb field, so
-             the extractor's CRUMB_NOT_FOUND default is what the loop
-             condition polls on). -->
+             concurrent load (NB: the "still scanning" page DOES carry a crumb - verified against a captured perf-test response - so crumb_token could never gate this loop; it exited after a single poll every time. The loop now polls scan_pending, set from the page's own meta-refresh). -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -892,6 +890,16 @@
                          testname="Wait 2s between polls (matches the page's meta-refresh)">
             <stringProp name="ConstantTimer.delay">2000</stringProp>
           </ConstantTimer>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract scan_pending (meta-refresh means still scanning)">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">scan_pending</stringProp>
+            <stringProp name="RegexExtractor.regex">http-equiv="(refresh)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">SCAN_DONE</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
           <hashTree/>
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                           testname="Extract crumb_token">
@@ -1268,7 +1276,7 @@ vars.put('siteId_matchNr', count.toString())</stringProp>
             <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                            testname="22f2a Reset crumb_token before poll">
               <stringProp name="scriptLanguage">groovy</stringProp>
-              <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+              <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
             </JSR223Sampler>
             <hashTree/>
 
@@ -1276,11 +1284,10 @@ vars.put('siteId_matchNr', count.toString())</stringProp>
                  scan completes, same reasoning and pattern as step 21's
                  sampling-plan poll above: a single fixed wait is not reliably
                  enough once CDP-uploader is under real concurrent load
-                 (confirmed here too: the "still scanning" page has no crumb
-                 field, matching status.njk). -->
+                 (NB: the "still scanning" page DOES carry a crumb - verified against a captured perf-test response - so crumb_token could never gate this loop; it exited after a single poll every time. The loop now polls scan_pending, set from the page's own meta-refresh). -->
             <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                               testname="22f3 Poll upload-bes-evidence/status until scan completes">
-              <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+              <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
             </WhileController>
             <hashTree>
             <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -1294,6 +1301,16 @@ vars.put('siteId_matchNr', count.toString())</stringProp>
                              testname="Wait 2s between polls (matches the page's meta-refresh)">
                 <stringProp name="ConstantTimer.delay">2000</stringProp>
               </ConstantTimer>
+              <hashTree/>
+              <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                              testname="Extract scan_pending (meta-refresh means still scanning)">
+                <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+                <stringProp name="RegexExtractor.refname">scan_pending</stringProp>
+                <stringProp name="RegexExtractor.regex">http-equiv="(refresh)"</stringProp>
+                <stringProp name="RegexExtractor.template">$1$</stringProp>
+                <stringProp name="RegexExtractor.default">SCAN_DONE</stringProp>
+                <stringProp name="RegexExtractor.match_no">1</stringProp>
+              </RegexExtractor>
               <hashTree/>
               <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                               testname="Extract crumb_token">

@@ -777,14 +777,14 @@ route to withdraw an application that was never submitted).</stringProp>
         <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                        testname="21a Reset crumb_token before poll">
           <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
         </JSR223Sampler>
         <hashTree/>
 
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -798,6 +798,16 @@ route to withdraw an application that was never submitted).</stringProp>
                          testname="Wait 2s between polls (matches the page's meta-refresh)">
             <stringProp name="ConstantTimer.delay">2000</stringProp>
           </ConstantTimer>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract scan_pending (meta-refresh means still scanning)">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">scan_pending</stringProp>
+            <stringProp name="RegexExtractor.regex">http-equiv="(refresh)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">SCAN_DONE</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
           <hashTree/>
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                           testname="Extract crumb_token">
@@ -1708,14 +1718,14 @@ route to withdraw an application that was never submitted).</stringProp>
         <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                        testname="21a Reset crumb_token before poll">
           <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
         </JSR223Sampler>
         <hashTree/>
 
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -1729,6 +1739,16 @@ route to withdraw an application that was never submitted).</stringProp>
                          testname="Wait 2s between polls (matches the page's meta-refresh)">
             <stringProp name="ConstantTimer.delay">2000</stringProp>
           </ConstantTimer>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract scan_pending (meta-refresh means still scanning)">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">scan_pending</stringProp>
+            <stringProp name="RegexExtractor.regex">http-equiv="(refresh)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">SCAN_DONE</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
           <hashTree/>
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                           testname="Extract crumb_token">
@@ -2784,14 +2804,14 @@ route to withdraw an application that was never submitted).</stringProp>
         <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                        testname="21a Reset crumb_token before poll">
           <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
         </JSR223Sampler>
         <hashTree/>
 
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -2805,6 +2825,16 @@ route to withdraw an application that was never submitted).</stringProp>
                          testname="Wait 2s between polls (matches the page's meta-refresh)">
             <stringProp name="ConstantTimer.delay">2000</stringProp>
           </ConstantTimer>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract scan_pending (meta-refresh means still scanning)">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">scan_pending</stringProp>
+            <stringProp name="RegexExtractor.regex">http-equiv="(refresh)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">SCAN_DONE</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
           <hashTree/>
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                           testname="Extract crumb_token">
@@ -3780,14 +3810,14 @@ route to withdraw an application that was never submitted).</stringProp>
         <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                        testname="21a Reset crumb_token before poll">
           <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
         </JSR223Sampler>
         <hashTree/>
 
         <!-- 21 GET sampling-plan/status (poll every 2s, like the page's own meta-refresh, until scan completes) -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -3801,6 +3831,16 @@ route to withdraw an application that was never submitted).</stringProp>
                          testname="Wait 2s between polls (matches the page's meta-refresh)">
             <stringProp name="ConstantTimer.delay">2000</stringProp>
           </ConstantTimer>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract scan_pending (meta-refresh means still scanning)">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">scan_pending</stringProp>
+            <stringProp name="RegexExtractor.regex">http-equiv="(refresh)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">SCAN_DONE</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
           <hashTree/>
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                           testname="Extract crumb_token">

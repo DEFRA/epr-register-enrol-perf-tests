@@ -839,14 +839,35 @@
           <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
             <collectionProp name="HTTPFileArgs.files">
               <elementProp name="sampling-plan.pdf" elementType="HTTPFileArg">
-                <stringProp name="File.path">${__P(test_files_dir,jmeter/test-files)}/sampling-plan.pdf</stringProp>
+                <stringProp name="File.path">${upload_file_path}</stringProp>
                 <stringProp name="File.paramname">file</stringProp>
                 <stringProp name="File.mimetype">application/pdf</stringProp>
               </elementProp>
             </collectionProp>
           </elementProp>
         </HTTPSamplerProxy>
-        <hashTree/>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor"
+                              testname="Copy template PDF to a unique filename (RA-571)">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="script">// RA-571: the app rejects any upload whose base name matches a file already on
+// the application (sampling plan + every site's BES evidence, case-insensitive,
+// extension ignored), so each upload gets its own uniquely named copy of the
+// template PDF - JMeter sends the file's own name as the multipart filename.
+import org.apache.jmeter.services.FileServer
+def template = new File(props.getProperty('test_files_dir', 'jmeter/test-files') + '/sampling-plan.pdf')
+if (!template.absolute &amp;&amp; !template.exists()) {
+  template = new File(FileServer.getFileServer().getBaseDir(), template.path)
+}
+def dir = new File(System.getProperty('java.io.tmpdir'), 'epr-perf-uploads')
+dir.mkdirs()
+def copy = new File(dir, 'sampling-plan-' + UUID.randomUUID() + '.pdf')
+copy.bytes = template.bytes
+copy.deleteOnExit()
+vars.put('upload_file_path', copy.absolutePath)</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+        </hashTree>
 
         <!-- 21a reset crumb_token so the while-condition below can't reuse a
              stale valid-looking value left over from the upload step and skip
@@ -854,7 +875,7 @@
         <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                        testname="21a Reset crumb_token before poll">
           <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING'); vars.put('scan_polls', '0')</stringProp>
         </JSR223Sampler>
         <hashTree/>
 
@@ -866,7 +887,7 @@
              concurrent load (NB: the "still scanning" page DOES carry a crumb - verified against a captured perf-test response - so crumb_token could never gate this loop; it exited after a single poll every time. The loop now polls scan_pending, set from the page's own meta-refresh). -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__intSum(${scan_polls},1,scan_polls)}&lt;=${__P(scan_poll_max,120)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -905,7 +926,7 @@
         </hashTree>
 
         <!-- 21b GET sampling-plan results - verify the CDP scan actually completed.
-             The poll loop above exits as soon as ANY crumb appears, which is also true
+             The poll loop above exits once the meta-refresh disappears, which is also true
              of /results?upload=failed, and the loop can simply exhaust its budget while
              the file is still scanning. Either way step 22 used to fail as a bare 400
              ("You must upload at least one file before continuing") with no clue why.
@@ -1232,14 +1253,35 @@
               <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
                 <collectionProp name="HTTPFileArgs.files">
                   <elementProp name="sampling-plan.pdf" elementType="HTTPFileArg">
-                    <stringProp name="File.path">${__P(test_files_dir,jmeter/test-files)}/sampling-plan.pdf</stringProp>
+                    <stringProp name="File.path">${upload_file_path}</stringProp>
                     <stringProp name="File.paramname">file</stringProp>
                     <stringProp name="File.mimetype">application/pdf</stringProp>
                   </elementProp>
                 </collectionProp>
               </elementProp>
             </HTTPSamplerProxy>
-            <hashTree/>
+            <hashTree>
+              <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor"
+                                  testname="Copy template PDF to a unique filename (RA-571)">
+                <stringProp name="scriptLanguage">groovy</stringProp>
+                <stringProp name="script">// RA-571: the app rejects any upload whose base name matches a file already on
+// the application (sampling plan + every site's BES evidence, case-insensitive,
+// extension ignored), so each upload gets its own uniquely named copy of the
+// template PDF - JMeter sends the file's own name as the multipart filename.
+import org.apache.jmeter.services.FileServer
+def template = new File(props.getProperty('test_files_dir', 'jmeter/test-files') + '/sampling-plan.pdf')
+if (!template.absolute &amp;&amp; !template.exists()) {
+  template = new File(FileServer.getFileServer().getBaseDir(), template.path)
+}
+def dir = new File(System.getProperty('java.io.tmpdir'), 'epr-perf-uploads')
+dir.mkdirs()
+def copy = new File(dir, 'bes-evidence-' + UUID.randomUUID() + '.pdf')
+copy.bytes = template.bytes
+copy.deleteOnExit()
+vars.put('upload_file_path', copy.absolutePath)</stringProp>
+              </JSR223PreProcessor>
+              <hashTree/>
+            </hashTree>
 
             <!-- 22f2a reset crumb_token so the while-condition below can't
                  reuse a stale valid-looking value left over from the upload
@@ -1247,7 +1289,7 @@
             <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                            testname="22f2a Reset crumb_token before poll">
               <stringProp name="scriptLanguage">groovy</stringProp>
-              <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING')</stringProp>
+              <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING'); vars.put('scan_polls', '0')</stringProp>
             </JSR223Sampler>
             <hashTree/>
 
@@ -1258,7 +1300,7 @@
                  (NB: the "still scanning" page DOES carry a crumb - verified against a captured perf-test response - so crumb_token could never gate this loop; it exited after a single poll every time. The loop now polls scan_pending, set from the page's own meta-refresh). -->
             <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                               testname="22f3 Poll upload-bes-evidence/status until scan completes">
-              <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__counter(TRUE,)}&lt;=${__P(scan_poll_max,30)},)}</stringProp>
+              <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__intSum(${scan_polls},1,scan_polls)}&lt;=${__P(scan_poll_max,120)},)}</stringProp>
             </WhileController>
             <hashTree>
             <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"

@@ -5,23 +5,24 @@
     <!-- ═══════════════════════════════════════════════════════════
          TEST PLAN
          Journey: Operator Accreditation, driven against the /operator
-         test-harness page's "PerfTest Records" fixture pool; 100
-         Reprocessor (org 60001-60100) and 100 Exporter (org 61001-61100)
-         fixtures, each with a fixed material and year (2027) baked into its
-         URL (verified against http://localhost:3000/operator). Each thread
-         reads one row (org/registration/material/type) from a pre-shuffled
-         CSV (see generate-operator-accreditation-fixtures.sh), so which
-         fixture a given user lands on is effectively random and no two
-         threads collide on the same one. Exporter rows take an extra
-         overseas-sites branch (see the If Controller after step 22) that
-         Reprocessor rows skip; everything else is identical.
+         test-harness page's "PerfTest Records" fixture pool; 100 Reprocessor
+         (org 60001-60100) and 100 Exporter (org 61001-61100) fixtures, each
+         linked at year 2027 on that page but run here at a fresh synthetic
+         year per run (any year gets-or-creates an application) (verified
+         against http://localhost:3000/operator). Each thread reads one row
+         (org/registration/material/type/year) from a pre-shuffled CSV (see
+         generate-operator-accreditation-fixtures.sh), so which fixture a
+         given user lands on is effectively random and no two threads collide
+         on the same one. Exporter rows take an extra overseas-sites branch
+         (see the If Controller after step 22) that Reprocessor rows skip;
+         everything else is identical.
 
-         These 200 fixtures are one-shot: the app correctly rejects
-         re-submitting an already-Submitted application, so once a run
-         consumes a fixture it's gone for good. users/ramp_time/loops
-         configurable via JMeter properties; run with
-         USERS=100 ./entrypoint.sh operator-accreditation for the full
-         1->100 ramp.
+         Each run gets a fresh block of synthetic years from
+         generate-operator-accreditation-fixtures.sh, so every row is a
+         brand-new application and the pool never runs out.
+         users/ramp_time/loops configurable via JMeter properties; run with
+         USERS=100 ./entrypoint.sh operator-accreditation for the full 1->100
+         ramp.
          Entry:   /operator-accreditation/{orgId}/{registrationId}/{material}/{year}
          Crawled: localhost:3000  2026-07-12, PerfTest Records verified 2026-08-30
          ═══════════════════════════════════════════════════════════ -->
@@ -138,16 +139,16 @@
       <hashTree>
 
         <!-- One row per thread, no recycling: each thread claims a distinct
-             fixture from the pre-shuffled 200-row pool and never revisits
+             fixture from the pre-shuffled 600-row pool and never revisits
              it, matching the same CSVDataSet convention already used in
              operator-journey-reprocessor-exporter.jmx and
-             case-management-journey.jmx. Threads beyond row 200 (more than
-             200 concurrent users) stop cleanly via stopThread rather than
+             case-management-journey.jmx. Threads beyond row 600 (more than
+             600 concurrent users) stop cleanly via stopThread rather than
              erroring or reusing a fixture. -->
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet"
-                    testname="CSV Data: operator-accreditation-fixtures.csv (200 rows)" enabled="true">
+                    testname="CSV Data: operator-accreditation-fixtures.csv (600 rows)" enabled="true">
           <stringProp name="filename">${DATA_DIR}/operator-accreditation-fixtures.csv</stringProp>
-          <stringProp name="variableNames">orgId,registrationId,material,type</stringProp>
+          <stringProp name="variableNames">orgId,registrationId,material,type,year</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
           <boolProp name="recycle">false</boolProp>
@@ -240,7 +241,7 @@
         <!-- 03 GET operator-accreditation landing -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="03 GET operator-accreditation landing">
-          <stringProp name="HTTPSampler.path">/operator-accreditation/${orgId}/${registrationId}/${material}/2027</stringProp>
+          <stringProp name="HTTPSampler.path">/operator-accreditation/${orgId}/${registrationId}/${material}/${year}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
         </HTTPSamplerProxy>
@@ -1161,15 +1162,39 @@ vars.put('upload_file_path', copy.absolutePath)</stringProp>
               <stringProp name="RegexExtractor.match_no">1</stringProp>
             </RegexExtractor>
             <hashTree/>
-            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
-                            testname="Extract siteId (all sites)">
-              <stringProp name="RegexExtractor.useHeaders">false</stringProp>
-              <stringProp name="RegexExtractor.refname">siteId</stringProp>
-              <stringProp name="RegexExtractor.regex">upload-bes-evidence/[^/]+/(\d+)"</stringProp>
-              <stringProp name="RegexExtractor.template">$1$</stringProp>
-              <stringProp name="RegexExtractor.default"></stringProp>
-              <stringProp name="RegexExtractor.match_no">-1</stringProp>
-            </RegexExtractor>
+            <!-- JSR223PostProcessor, not a second RegexExtractor: verified
+                 empirically (a temporary debug sampler + captured response
+                 dumps) that a second RegexExtractor sibling in this same
+                 scope never executes at all; crumb_token's extractor above
+                 always populates correctly, but a second RegexExtractor here
+                 left siteId_matchNr permanently null/unset even though the
+                 exact same regex matches the exact same response correctly
+                 outside JMeter (confirmed against captured response bodies
+                 that do contain the expected upload-bes-evidence links).
+                 Doing the regex manually in Groovy sidesteps whatever this
+                 engine limitation is, and replicates RegexExtractor's own
+                 match_no=-1 variable convention (siteId_1..siteId_n,
+                 siteId_matchNr) so the ForEach controller below needs no
+                 changes. -->
+            <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor"
+                                  testname="Extract siteId (all sites)">
+              <stringProp name="scriptLanguage">groovy</stringProp>
+              <stringProp name="script">import java.util.regex.Pattern
+
+def response = prev.getResponseDataAsString()
+def pattern = Pattern.compile('upload-bes-evidence/[^/]+/(\\d+)"')
+def matcher = pattern.matcher(response)
+def seen = new LinkedHashSet()
+while (matcher.find()) {
+    seen.add(matcher.group(1))
+}
+def count = 0
+for (id in seen) {
+    count++
+    vars.put('siteId_' + count, id)
+}
+vars.put('siteId_matchNr', count.toString())</stringProp>
+            </JSR223PostProcessor>
             <hashTree/>
           </hashTree>
 

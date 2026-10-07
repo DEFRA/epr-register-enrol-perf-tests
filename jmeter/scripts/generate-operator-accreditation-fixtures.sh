@@ -3,22 +3,12 @@
 # PerfTest Records fixture pool.
 #
 # The /operator test-harness page lists 100 Reprocessor fixtures (org
-# 60001-60100) and 100 Exporter fixtures (org 61001-61100), each with a fixed
-# material and year (2027) already baked into its URL -- a static,
-# pre-existing pool, unlike operator-journey-reprocessor-exporter.jmx's own
-# CSVs (seed-operator-journey-csvs.sh), which generate brand-new applications
-# each run via a synthetic year. These 200 fixtures can each only be
-# submitted ONCE ever (the app correctly rejects re-submitting an already-
-# Submitted application) -- there is no "generate fresh ones" option here,
-# since the org/registration/material/year combination IS the fixture, fixed
-# by the harness page itself. Re-running this suite against the same 200
-# fixtures a second time will start failing once they're all consumed; that's
-# expected, not a bug, and outside what this script can work around.
-#
-# This script only shuffles the row order (so which fixture each thread number
-# lands on varies run to run) and writes the CSV -- no live HTTP calls needed,
-# since org IDs/registrationIds/materials are deterministic from the harness
-# page's own listing (verified against http://localhost:3000/operator).
+# 60001-60100) and 100 Exporter fixtures (org 61001-61100), linked at year
+# 2027. The landing page gets-or-creates an application keyed on
+# (registrationId, materialType, year) and any year works, so each run gets a
+# fresh block of synthetic years and every row is a brand-new application --
+# see generate-accreditation-fixtures.sh for the verification and why years
+# come from 8100-9999. Override ACCREDITATION_YEAR_BASE to pin the block.
 #
 # Usage: ./jmeter/scripts/generate-operator-accreditation-fixtures.sh
 set -euo pipefail
@@ -28,19 +18,24 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DATA_DIR="$REPO_ROOT/jmeter/data"
 mkdir -p "$DATA_DIR"
 
-python3 - "$DATA_DIR" <<'PYEOF'
-import sys, random
+python3 - "$DATA_DIR" "${ACCREDITATION_YEAR_BASE:-}" <<'PYEOF'
+import sys, random, time
 
-data_dir = sys.argv[1]
+data_dir, year_base_override = sys.argv[1], sys.argv[2]
 materials = ["Plastic", "Glass", "Steel", "Aluminium", "Paper", "Wood", "Fibre"]
+YEARS_PER_RUN = 3
+
+base_year = int(year_base_override) if year_base_override else 8100 + int(time.time()) % 1890
+years = list(range(base_year, base_year + YEARS_PER_RUN))
 
 def fixture_rows(org_base, fixture_type, count=100):
     rows = []
-    for i in range(1, count + 1):
-        org_id = org_base + i
-        registration_id = f"aaa{org_id:021d}"
-        material = materials[(i - 1) % len(materials)]
-        rows.append((org_id, registration_id, material, fixture_type))
+    for year in years:
+        for i in range(1, count + 1):
+            org_id = org_base + i
+            registration_id = f"aaa{org_id:021d}"
+            material = materials[(i - 1) % len(materials)]
+            rows.append((org_id, registration_id, material, fixture_type, year))
     return rows
 
 rows = fixture_rows(60000, "Reprocessor") + fixture_rows(61000, "Exporter")
@@ -48,18 +43,16 @@ random.shuffle(rows)
 
 path = f"{data_dir}/operator-accreditation-fixtures.csv"
 with open(path, "w") as f:
-    f.write("orgId,registrationId,material,type\n")
-    for org_id, registration_id, material, fixture_type in rows:
-        f.write(f"{org_id},{registration_id},{material},{fixture_type}\n")
+    f.write("orgId,registrationId,material,type,year\n")
+    for org_id, registration_id, material, fixture_type, year in rows:
+        f.write(f"{org_id},{registration_id},{material},{fixture_type},{year}\n")
 
 reprocessor_count = sum(1 for r in rows if r[3] == "Reprocessor")
 exporter_count = sum(1 for r in rows if r[3] == "Exporter")
 print(f"operator-accreditation-fixtures.csv -> {len(rows)} rows "
-      f"({reprocessor_count} Reprocessor, {exporter_count} Exporter), shuffled")
+      f"({reprocessor_count} Reprocessor, {exporter_count} Exporter), "
+      f"years {years[0]}-{years[-1]}, shuffled")
 PYEOF
 
 echo ""
 echo "Run with: USERS=100 ./entrypoint.sh operator-accreditation"
-echo "  (each of the 200 fixtures is one-shot -- once consumed by a run, re-running"
-echo "   against the same fixtures will fail; regenerate only gives a fresh SHUFFLE"
-echo "   of the same 200, not new fixtures)"

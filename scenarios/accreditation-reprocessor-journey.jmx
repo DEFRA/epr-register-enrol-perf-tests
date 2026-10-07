@@ -6,13 +6,14 @@
          TEST PLAN
          Journey: Operator Accreditation — Reprocessor only, driven against
          the /operator test-harness page's "PerfTest Records" > Reprocessors
-         fixture pool: 100 fixtures (org 60001-60100), each with a fixed
-         material and year (2027) baked into its URL (verified against
+         fixture pool: 100 fixtures (org 60001-60100), each linked at year
+         2027 on that page but run here at a fresh synthetic year per run (any
+         year gets-or-creates an application) (verified against
          http://localhost:3000/operator). Each thread reads one row
-         (org/registration/material) from a pre-shuffled CSV (see
+         (org/registration/material/year) from a pre-shuffled CSV (see
          generate-accreditation-fixtures.sh), so which fixture a given user
-         lands on is effectively random and no two threads collide on the
-         same one.
+         lands on is effectively random and no two threads collide on the same
+         one.
 
          Task list has 3 sections for this fixture type (verified against
          /accreditation/task-list): PRNs (tonnage), Business Plan, Sampling
@@ -21,11 +22,11 @@
          is a separate, dedicated jmx rather than a branch in one combined
          file.
 
-         These 100 fixtures are one-shot: the app correctly rejects
-         re-submitting an already-Submitted application, so once a run
-         consumes a fixture it's gone for good. users/ramp_time/loops
-         configurable via JMeter properties; run with
-         ./entrypoint.sh accreditation-reprocessor.
+         Each run gets a fresh block of synthetic years from
+         generate-accreditation-fixtures.sh, so every row is a brand-new
+         application and the pool never runs out. users/ramp_time/loops
+         configurable via JMeter properties; run with ./entrypoint.sh
+         accreditation-reprocessor.
          Entry:   /operator-accreditation/{orgId}/{registrationId}/{material}/{year}
          Crawled: localhost:3000  2026-07-12, PerfTest Records verified 2026-08-30
          ═══════════════════════════════════════════════════════════ -->
@@ -140,16 +141,16 @@
       <hashTree>
 
         <!-- One row per thread, no recycling: each thread claims a distinct
-             fixture from the pre-shuffled 200-row pool and never revisits
+             fixture from the pre-shuffled 300-row pool and never revisits
              it, matching the same CSVDataSet convention already used in
              operator-journey-reprocessor-exporter.jmx and
-             case-management-journey.jmx. Threads beyond row 200 (more than
-             200 concurrent users) stop cleanly via stopThread rather than
+             case-management-journey.jmx. Threads beyond row 300 (more than
+             300 concurrent users) stop cleanly via stopThread rather than
              erroring or reusing a fixture. -->
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet"
-                    testname="CSV Data: accreditation-reprocessor-fixtures.csv (100 rows)" enabled="true">
+                    testname="CSV Data: accreditation-reprocessor-fixtures.csv (300 rows)" enabled="true">
           <stringProp name="filename">${DATA_DIR}/accreditation-reprocessor-fixtures.csv</stringProp>
-          <stringProp name="variableNames">orgId,registrationId,material</stringProp>
+          <stringProp name="variableNames">orgId,registrationId,material,year</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
           <boolProp name="recycle">false</boolProp>
@@ -242,7 +243,7 @@
         <!-- 03 GET operator-accreditation landing -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="03 GET operator-accreditation landing">
-          <stringProp name="HTTPSampler.path">/operator-accreditation/${orgId}/${registrationId}/${material}/2027</stringProp>
+          <stringProp name="HTTPSampler.path">/operator-accreditation/${orgId}/${registrationId}/${material}/${year}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
         </HTTPSamplerProxy>

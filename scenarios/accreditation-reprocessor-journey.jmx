@@ -6,13 +6,14 @@
          TEST PLAN
          Journey: Operator Accreditation — Reprocessor only, driven against
          the /operator test-harness page's "PerfTest Records" > Reprocessors
-         fixture pool: 100 fixtures (org 60001-60100), each with a fixed
-         material and year (2027) baked into its URL (verified against
+         fixture pool: 100 fixtures (org 60001-60100), each linked at year
+         2027 on that page but run here at a fresh synthetic year per run (any
+         year gets-or-creates an application) (verified against
          http://localhost:3000/operator). Each thread reads one row
-         (org/registration/material) from a pre-shuffled CSV (see
+         (org/registration/material/year) from a pre-shuffled CSV (see
          generate-accreditation-fixtures.sh), so which fixture a given user
-         lands on is effectively random and no two threads collide on the
-         same one.
+         lands on is effectively random and no two threads collide on the same
+         one.
 
          Task list has 3 sections for this fixture type (verified against
          /accreditation/task-list): PRNs (tonnage), Business Plan, Sampling
@@ -21,11 +22,11 @@
          is a separate, dedicated jmx rather than a branch in one combined
          file.
 
-         These 100 fixtures are one-shot: the app correctly rejects
-         re-submitting an already-Submitted application, so once a run
-         consumes a fixture it's gone for good. users/ramp_time/loops
-         configurable via JMeter properties; run with
-         ./entrypoint.sh accreditation-reprocessor.
+         Each run gets a fresh block of synthetic years from
+         generate-accreditation-fixtures.sh, so every row is a brand-new
+         application and the pool never runs out. users/ramp_time/loops
+         configurable via JMeter properties; run with ./entrypoint.sh
+         accreditation-reprocessor.
          Entry:   /operator-accreditation/{orgId}/{registrationId}/{material}/{year}
          Crawled: localhost:3000  2026-07-12, PerfTest Records verified 2026-08-30
          ═══════════════════════════════════════════════════════════ -->
@@ -140,16 +141,16 @@
       <hashTree>
 
         <!-- One row per thread, no recycling: each thread claims a distinct
-             fixture from the pre-shuffled 200-row pool and never revisits
+             fixture from the pre-shuffled 300-row pool and never revisits
              it, matching the same CSVDataSet convention already used in
              operator-journey-reprocessor-exporter.jmx and
-             case-management-journey.jmx. Threads beyond row 200 (more than
-             200 concurrent users) stop cleanly via stopThread rather than
+             case-management-journey.jmx. Threads beyond row 300 (more than
+             300 concurrent users) stop cleanly via stopThread rather than
              erroring or reusing a fixture. -->
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet"
-                    testname="CSV Data: accreditation-reprocessor-fixtures.csv (100 rows)" enabled="true">
+                    testname="CSV Data: accreditation-reprocessor-fixtures.csv (300 rows)" enabled="true">
           <stringProp name="filename">${DATA_DIR}/accreditation-reprocessor-fixtures.csv</stringProp>
-          <stringProp name="variableNames">orgId,registrationId,material</stringProp>
+          <stringProp name="variableNames">orgId,registrationId,material,year</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
           <boolProp name="recycle">false</boolProp>
@@ -242,7 +243,7 @@
         <!-- 03 GET operator-accreditation landing -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
                           testname="03 GET operator-accreditation landing">
-          <stringProp name="HTTPSampler.path">/operator-accreditation/${orgId}/${registrationId}/${material}/2027</stringProp>
+          <stringProp name="HTTPSampler.path">/operator-accreditation/${orgId}/${registrationId}/${material}/${year}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
         </HTTPSamplerProxy>
@@ -841,14 +842,35 @@
           <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
             <collectionProp name="HTTPFileArgs.files">
               <elementProp name="sampling-plan.pdf" elementType="HTTPFileArg">
-                <stringProp name="File.path">${__P(test_files_dir,jmeter/test-files)}/sampling-plan.pdf</stringProp>
+                <stringProp name="File.path">${upload_file_path}</stringProp>
                 <stringProp name="File.paramname">file</stringProp>
                 <stringProp name="File.mimetype">application/pdf</stringProp>
               </elementProp>
             </collectionProp>
           </elementProp>
         </HTTPSamplerProxy>
-        <hashTree/>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor"
+                              testname="Copy template PDF to a unique filename (RA-571)">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="script">// RA-571: the app rejects any upload whose base name matches a file already on
+// the application (sampling plan + every site's BES evidence, case-insensitive,
+// extension ignored), so each upload gets its own uniquely named copy of the
+// template PDF - JMeter sends the file's own name as the multipart filename.
+import org.apache.jmeter.services.FileServer
+def template = new File(props.getProperty('test_files_dir', 'jmeter/test-files') + '/sampling-plan.pdf')
+if (!template.absolute &amp;&amp; !template.exists()) {
+  template = new File(FileServer.getFileServer().getBaseDir(), template.path)
+}
+def dir = new File(System.getProperty('java.io.tmpdir'), 'epr-perf-uploads')
+dir.mkdirs()
+def copy = new File(dir, 'sampling-plan-' + UUID.randomUUID() + '.pdf')
+copy.bytes = template.bytes
+copy.deleteOnExit()
+vars.put('upload_file_path', copy.absolutePath)</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+        </hashTree>
 
         <!-- 21a reset crumb_token so the while-condition below can't reuse a
              stale valid-looking value left over from the upload step and skip
@@ -856,7 +878,7 @@
         <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler"
                        testname="21a Reset crumb_token before poll">
           <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND')</stringProp>
+          <stringProp name="script">vars.put('crumb_token', 'CRUMB_NOT_FOUND'); vars.put('scan_pending', 'SCANNING'); vars.put('scan_polls', '0')</stringProp>
         </JSR223Sampler>
         <hashTree/>
 
@@ -865,12 +887,10 @@
              wait: verified against operator-journey-reprocessor-exporter.jmx,
              which uses this exact pattern at 100-user scale because a fixed
              5s wait proved insufficient once CDP-uploader is under real
-             concurrent load (the "still scanning" page has no crumb field, so
-             the extractor's CRUMB_NOT_FOUND default is what the loop
-             condition polls on). -->
+             concurrent load (NB: the "still scanning" page DOES carry a crumb - verified against a captured perf-test response - so crumb_token could never gate this loop; it exited after a single poll every time. The loop now polls scan_pending, set from the page's own meta-refresh). -->
         <WhileController guiclass="WhileControllerGui" testclass="WhileController"
                           testname="21 Poll sampling-plan/status until scan completes">
-          <stringProp name="WhileController.condition">${__javaScript("${crumb_token}"=="CRUMB_NOT_FOUND" &amp;&amp; ${__counter(TRUE,)}&lt;=12,)}</stringProp>
+          <stringProp name="WhileController.condition">${__javaScript("${scan_pending}"!="SCAN_DONE" &amp;&amp; ${__intSum(${scan_polls},1,scan_polls)}&lt;=${__P(scan_poll_max,120)},)}</stringProp>
         </WhileController>
         <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
@@ -886,6 +906,16 @@
           </ConstantTimer>
           <hashTree/>
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract scan_pending (meta-refresh means still scanning)">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">scan_pending</stringProp>
+            <stringProp name="RegexExtractor.regex">http-equiv="(refresh)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">SCAN_DONE</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
                           testname="Extract crumb_token">
             <stringProp name="RegexExtractor.useHeaders">false</stringProp>
             <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
@@ -896,6 +926,59 @@
           </RegexExtractor>
           <hashTree/>
         </hashTree>
+        </hashTree>
+
+        <!-- 21b GET sampling-plan results - verify the CDP scan actually completed.
+             The poll loop above exits once the meta-refresh disappears, which is also true
+             of /results?upload=failed, and the loop can simply exhaust its budget while
+             the file is still scanning. Either way step 22 used to fail as a bare 400
+             ("You must upload at least one file before continuing") with no clue why.
+             Asserting here names the real cause and refreshes the crumb from a page we
+             have actually verified. -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy"
+                          testname="21b GET sampling-plan results (verify scan completed)">
+          <stringProp name="HTTPSampler.path">/accreditation/sampling-plan/${applicationId}/results</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert scan completed (uploaded file is listed)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="uploaded_files_table">data-testid="uploaded-files-table"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">16</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion"
+                             testname="Assert upload not rejected (no error summary)">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="no_error_summary">data-testid="error-summary"</stringProp>
+            </collectionProp>
+            <intProp name="Assertion.test_type">20</intProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor"
+                          testname="Extract crumb_token">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">crumb_token</stringProp>
+            <stringProp name="RegexExtractor.regex">name="crumb"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">CRUMB_NOT_FOUND</stringProp>
+            <stringProp name="RegexExtractor.match_no">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
         </hashTree>
 
         <!-- 22 POST sampling-plan results – mark section complete (file already
